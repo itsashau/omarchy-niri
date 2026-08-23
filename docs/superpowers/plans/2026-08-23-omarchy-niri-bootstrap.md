@@ -262,7 +262,7 @@ Expected: push succeeds; `niri-support` now exists on
 
 ---
 
-## Task 7: Clone the fork inside the VM and activate `omarchy dev link`
+## Task 7: Clone the fork inside the VM and activate `omarchy dev link` — DONE
 
 `omarchy dev link` operates on whichever machine you run it on — it writes
 that machine's own `/etc/omarchy.conf`. So the checkout it points at has
@@ -320,7 +320,7 @@ theming pipeline still works when running from the linked checkout.
 
 ---
 
-## Task 8: Snapshot the dev-linked baseline
+## Task 8: Snapshot the dev-linked baseline — DONE
 
 **Files:** None (VM snapshot).
 
