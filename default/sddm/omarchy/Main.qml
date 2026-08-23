@@ -140,11 +140,11 @@ Rectangle {
     Text {
       anchors.horizontalCenter: parent.horizontalCenter
       text: "‹ " + root.sessionName(root.sessionIndex) + " ›"
-      color: "#a9b1d6"
+      color: "#ffffff"
       font.family: "JetBrainsMono Nerd Font"
       font.pixelSize: 14
+      opacity: 0.7
     }
-
   }
 
   Component.onCompleted: {
