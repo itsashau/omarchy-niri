@@ -104,9 +104,11 @@ Item {
   function handleWorkspaceActivated(data) {
     var activatedId = data.id
     var affectedOutput = ""
+    var found = false
     for (var i = 0; i < root.workspaces.length; i++) {
-      if (root.workspaces[i].id === activatedId) { affectedOutput = root.workspaces[i].output; break }
+      if (root.workspaces[i].id === activatedId) { affectedOutput = root.workspaces[i].output; found = true; break }
     }
+    if (!found) return
 
     var next = []
     var focusedId = data.focused ? -1 : root.focusedWorkspaceId
