@@ -11,17 +11,25 @@ Rectangle {
   property bool loginFailed: false
   property int sessionIndex: -1
 
-  function defaultSessionIndex() {
-    for (var i = 0; i < sessionModel.rowCount(); i++) {
-      var name = (sessionModel.data(sessionModel.index(i, 0), Qt.DisplayRole) || "").toString()
-      if (name.indexOf("uwsm") !== -1)
-        return i
+  Repeater {
+    id: sessionRepeater
+    model: sessionModel
+    delegate: Item {
+      property string sessName: name
     }
-    return sessionModel.lastIndex
   }
 
   function sessionName(i) {
-    return (sessionModel.data(sessionModel.index(i, 0), Qt.DisplayRole) || "").toString()
+    var item = sessionRepeater.itemAt(i)
+    return item ? item.sessName : ""
+  }
+
+  function defaultSessionIndex() {
+    for (var i = 0; i < sessionModel.rowCount(); i++) {
+      if (sessionName(i).indexOf("uwsm") !== -1)
+        return i
+    }
+    return sessionModel.lastIndex
   }
 
   function cycleSession(delta) {
