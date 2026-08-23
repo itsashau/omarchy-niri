@@ -12,16 +12,9 @@ usage() {
 app=${1:-}
 [[ -n $app ]] || usage
 
-# Agent terminals notify sharing one app_id, org.omarchy.agent, while their
-# specific identity (which agent) only ever lived in the terminal's
-# launch-time title. Hyprland's sibling script disambiguates via that
-# launch-time title (initialTitle in hyprctl's own window data) — niri's
-# IPC has no equivalent field at all, only a window's current, live title.
-# This falls back to matching the CURRENT title instead: good enough for
-# personal use since agent-terminal titles rarely drift far from their
-# launch value in practice, but a real simplification — if a terminal's
-# title has since changed (e.g. to show a working directory), this won't
-# find it. Revisit only if that turns out to matter in practice.
+# Agent terminals share one app_id, org.omarchy.agent, with their identity
+# only ever in the launch-time title — niri's IPC has no equivalent field,
+# only the current title, so this matches on that instead.
 id=$(
   niri msg -j windows 2>/dev/null |
     jq -r --arg pattern "$app" \
