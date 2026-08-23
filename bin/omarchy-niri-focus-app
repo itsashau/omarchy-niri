@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# omarchy:summary=Focus a Niri window by application identity
+# omarchy:args=<app-name>
+# omarchy:examples=omarchy niri focus app Slack
+
+usage() {
+  echo "Usage: omarchy-niri-focus-app <app-name>" >&2
+  exit 1
+}
+
+app=${1:-}
+[[ -n $app ]] || usage
+
+# Agent terminals notify sharing one app_id, org.omarchy.agent, while their
+# specific identity (which agent) only ever lived in the terminal's
+# launch-time title. Hyprland's sibling script disambiguates via that
+# launch-time title (initialTitle in hyprctl's own window data) — niri's
+# IPC has no equivalent field at all, only a window's current, live title.
+# This falls back to matching the CURRENT title instead: good enough for
+# personal use since agent-terminal titles rarely drift far from their
+# launch value in practice, but a real simplification — if a terminal's
+# title has since changed (e.g. to show a working directory), this won't
+# find it. Revisit only if that turns out to matter in practice.
+id=$(
+  niri msg -j windows 2>/dev/null |
+    jq -r --arg pattern "$app" \
+      'def matches($value): ($value // "") | test($pattern; "i");
+       first(
+         (.[] | select(matches(.app_id))),
+         (.[] | select(.app_id == "org.omarchy.agent" and matches(.title)))
+       ).id // empty'
+)
+
+[[ -n $id ]] || exit 1
+
+niri msg action focus-window --id "$id" >/dev/null 2>&1
