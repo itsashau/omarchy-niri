@@ -10,8 +10,20 @@ BarWidget {
   id: root
   moduleName: "omarchy.keyboard-layout"
 
+  readonly property var niriService: root.bar && root.bar.shell ? root.bar.shell.firstPartyServiceFor("omarchy.niri") : null
+  readonly property bool niriActive: !!(niriService && niriService.active)
 
-  property string layoutFull: ""
+  // Hyprland's own reading of the layout. Kept under a different name than
+  // `layoutFull` so queryProc's imperative writes (below) don't collide with
+  // `layoutFull` becoming a computed binding that also has to cover Niri.
+  property string hyprLayoutFull: ""
+  readonly property string layoutFull: root.niriActive ? root.niriLayoutFull() : root.hyprLayoutFull
+
+  function niriLayoutFull() {
+    var names = root.niriService.keyboardLayoutNames
+    var idx = root.niriService.keyboardLayoutCurrentIdx
+    return (idx >= 0 && idx < names.length) ? String(names[idx]) : ""
+  }
   // The keyboard the last reading spoke for, which is the one a click switches,
   // and separately the one activelayout named as being typed on. A reading
   // confirms the first is really there, so the click has a keyboard to reach
@@ -26,7 +38,8 @@ BarWidget {
   // Nothing to read or switch on the single-layout install most people run, so
   // the widget ships on the bar and stays out of the way until there are two.
   // An older Hyprland that doesn't report the list keeps showing the label.
-  property bool multipleLayouts: true
+  property bool hyprMultipleLayouts: true
+  readonly property bool multipleLayouts: root.niriActive ? (root.niriService.keyboardLayoutNames.length > 1) : root.hyprMultipleLayouts
   // Short language code per layout description ("English (US)": "en"), read from
   // xkb's own table rather than maintained by hand.
   property var layoutBriefs: ({})
@@ -72,14 +85,16 @@ BarWidget {
   // layout leaves the button reading as the furthest along, and the label
   // follows the button.
   function cycleLayout() {
-    if (!root.keyboardName || !root.bar) return
+    if (!root.bar) return
+    if (root.niriActive) { root.niriService.switchLayout(); return }
+    if (!root.keyboardName) return
     root.bar.run("hyprctl switchxkblayout " + Util.shellQuote(root.keyboardName) + " next")
     refreshTimer.restart()
   }
 
   Component.onCompleted: {
     briefsProc.running = true
-    refresh()
+    if (!root.niriActive) refresh()
   }
 
   Connections {
@@ -139,7 +154,7 @@ BarWidget {
           // changed settle the poll.
           root.keyboardUnresolved = true
           if (typed.length === 0) {
-            root.layoutFull = ""
+            root.hyprLayoutFull = ""
             root.keyboardName = ""
           }
           return
@@ -148,8 +163,8 @@ BarWidget {
         root.keyboardUnresolved = false
         root.keyboardCount = typed.length
         root.keyboardName = String(kb.name || "")
-        root.multipleLayouts = kb.layout === undefined || String(kb.layout).indexOf(",") !== -1
-        root.layoutFull = kb.active_keymap
+        root.hyprMultipleLayouts = kb.layout === undefined || String(kb.layout).indexOf(",") !== -1
+        root.hyprLayoutFull = kb.active_keymap
       }
     }
   }
@@ -196,7 +211,7 @@ BarWidget {
   // spawning hyprctl forever for an answer that cannot change.
   Timer {
     interval: 10000
-    running: !root.keyboardName || root.keyboardUnresolved || root.keyboardCount > 1
+    running: !root.niriActive && (!root.keyboardName || root.keyboardUnresolved || root.keyboardCount > 1)
     repeat: true
     onTriggered: root.refresh()
   }
