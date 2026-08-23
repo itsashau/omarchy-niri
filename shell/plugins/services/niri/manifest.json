@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "omarchy.niri",
+  "name": "Niri",
+  "version": "1.0.0",
+  "author": "Omarchy",
+  "description": "Quickshell-based workspace/window state for the Niri compositor, sourced from niri's IPC.",
+  "kinds": [
+    "service"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml"
+  }
+}
