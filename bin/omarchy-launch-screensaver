@@ -14,7 +14,11 @@ if omarchy-toggle-enabled screensaver-off && [[ $1 != "force" ]]; then
   exit 1
 fi
 
-focused=$(omarchy-hyprland-monitor-focused)
+if [[ -n ${NIRI_SOCKET:-} ]]; then
+  focused=$(omarchy-niri-monitor-focused)
+else
+  focused=$(omarchy-hyprland-monitor-focused)
+fi
 terminal=$(xdg-terminal-exec --print-id)
 
 case $terminal in
@@ -36,11 +40,23 @@ hypr_exec() {
   hyprctl dispatch "hl.dsp.exec_cmd([[$command]])" >/dev/null 2>&1 || hyprctl dispatch exec -- bash -lc "$command" >/dev/null
 }
 
+niri_focus_monitor() {
+  niri msg action focus-monitor "$1" >/dev/null 2>&1
+}
+
+niri_exec() {
+  niri msg action spawn -- "$@" >/dev/null 2>&1
+}
+
 SOCKET="$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock"
 
 # Open Hyprland's event stream before spawning anything, so a terminal that maps
 # quickly can't emit its openwindow event before we are listening for it.
 exec {events}< <(socat -U - "UNIX-CONNECT:$SOCKET")
+
+if [[ -n ${NIRI_SOCKET:-} ]]; then
+  exec {niri_events}< <(printf '"EventStream"\n' | socat -U - "UNIX-CONNECT:$NIRI_SOCKET")
+fi
 
 # hypr_exec is async and a new window maps on whatever monitor is focused at that
 # moment. Block until this monitor's screensaver actually opens before moving
@@ -53,25 +69,43 @@ wait_for_screensaver_window() {
   done
 }
 
-for m in $(hyprctl monitors -j | jq -r '.[] | .name'); do
-  hypr_focus_monitor "$m"
+wait_for_niri_screensaver_window() {
+  local line deadline=$((SECONDS + 5))
+  while ((SECONDS < deadline)) && IFS= read -r -t $((deadline - SECONDS)) -u "$niri_events" line; do
+    [[ $(jq -r '.WindowOpenedOrChanged.window.app_id // empty' <<<"$line" 2>/dev/null) == "org.omarchy.screensaver" ]] && return 0
+  done
+}
 
+launch_screensaver_terminal() {
+  local exec_fn="$1"
   case $terminal in
   *Alacritty*)
-    hypr_exec alacritty --class=org.omarchy.screensaver --config-file "$OMARCHY_PATH/default/alacritty/screensaver.toml" -e omarchy-screensaver
+    "$exec_fn" alacritty --class=org.omarchy.screensaver --config-file "$OMARCHY_PATH/default/alacritty/screensaver.toml" -e omarchy-screensaver
     ;;
   *ghostty*)
-    hypr_exec ghostty --class=org.omarchy.screensaver --config-file="$OMARCHY_PATH/default/ghostty/screensaver" --font-size=18 -e omarchy-screensaver
+    "$exec_fn" ghostty --class=org.omarchy.screensaver --config-file="$OMARCHY_PATH/default/ghostty/screensaver" --font-size=18 -e omarchy-screensaver
     ;;
   *foot*)
-    hypr_exec foot --app-id=org.omarchy.screensaver --config="$OMARCHY_PATH/default/foot/screensaver.ini" -e omarchy-screensaver
+    "$exec_fn" foot --app-id=org.omarchy.screensaver --config="$OMARCHY_PATH/default/foot/screensaver.ini" -e omarchy-screensaver
     ;;
   *kitty*)
-    hypr_exec kitty --class=org.omarchy.screensaver --override font_size=18 --override window_padding_width=0 -e omarchy-screensaver
+    "$exec_fn" kitty --class=org.omarchy.screensaver --override font_size=18 --override window_padding_width=0 -e omarchy-screensaver
     ;;
   esac
+}
 
-  wait_for_screensaver_window
-done
-
-hypr_focus_monitor "$focused"
+if [[ -n ${NIRI_SOCKET:-} ]]; then
+  for m in $(niri msg -j outputs | jq -r 'keys[]'); do
+    niri_focus_monitor "$m"
+    launch_screensaver_terminal niri_exec
+    wait_for_niri_screensaver_window
+  done
+  niri_focus_monitor "$focused"
+else
+  for m in $(hyprctl monitors -j | jq -r '.[] | .name'); do
+    hypr_focus_monitor "$m"
+    launch_screensaver_terminal hypr_exec
+    wait_for_screensaver_window
+  done
+  hypr_focus_monitor "$focused"
+fi
