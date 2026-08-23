@@ -56,13 +56,13 @@ hyprland-guiutils
 hyprland-preview-share-picker
 hyprpicker
 hyprsunset
-niri
 imagemagick
 imv
 inetutils
 inotify-tools
 inxi
 networkmanager
+niri
 jq
 kdenlive
 kernel-modules-hook
