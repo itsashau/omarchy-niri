@@ -4,7 +4,7 @@ import Quickshell.Hyprland
 import Quickshell.Wayland
 import qs.Commons
 
-PopupWindow {
+Item {
   id: root
 
   required property Item anchorItem
@@ -18,14 +18,15 @@ PopupWindow {
   property var borderSpec: Border.localOrSurfaceSpec("popups", "border", borderColor, Color.popups.border, Math.max(1, Style.space(2)))
   property bool open: false
   property bool centerOnBar: false
-  // "click" — uses HyprlandFocusGrab so clicking outside dismisses the popup.
+  // "click" — uses HyprlandFocusGrab (Hyprland) or a same-surface dismiss
+  // overlay (Niri) so clicking outside dismisses the popup.
   // "hover" — passive overlay; the owning widget controls open via hover.
   property string triggerMode: "click"
 
   readonly property var coordinatorKey: owner || root
   readonly property var anchorWindow: anchorItem ? anchorItem.QsWindow.window : null
   readonly property var popupScreen: anchorWindow ? anchorWindow.screen : null
-  readonly property bool containsMouse: cardHover.hovered
+  readonly property bool containsMouse: Compositor.isNiri ? niriCardHover.hovered : cardHover.hovered
   readonly property real screenW: popupScreen ? popupScreen.width : 0
   readonly property real screenH: popupScreen ? popupScreen.height : 0
   readonly property real barW: anchorWindow ? anchorWindow.width : 0
@@ -37,6 +38,13 @@ PopupWindow {
     ? Math.max(120, screenH - ((bar && (bar.position === "top" || bar.position === "bottom")) ? barH : 0) - root.margin * 2)
     : 0
   readonly property real verticalContentInset: padding * 2 + Border.top(borderSpec) + Border.bottom(borderSpec)
+
+  // Mirrors whichever surface is actually active so a consumer's
+  // `onVisibleChanged` (e.g. Tray.qml's trayMenuPopup, which waits for the
+  // fade-out to finish before resetting submenu state) keeps working the
+  // same way it did when PopupCard's root was the PopupWindow/PanelWindow
+  // itself and this property was that window's real visibility.
+  visible: Compositor.isNiri ? niriPopup.visible : hyprPopup.visible
 
   function fittedContentWidth(width, cap) {
     var desired = Math.max(1, Number(width) || 1)
@@ -63,12 +71,18 @@ PopupWindow {
     else root.open = false
   }
 
-  default property alias contentItem: contentHolder.children
+  // The consumer's child content is declared once and reparented, at
+  // startup only, into whichever card is actually active. Safe because
+  // Compositor.isNiri is fixed for the process lifetime — it never
+  // toggles at runtime, so this is a one-time decision, not a dynamic one.
+  default property alias contentItem: contentEnvelope.children
+  Item { id: contentEnvelope }
 
-  visible: open || card.opacity > 0
-  color: "transparent"
-  implicitWidth: contentWidth
-  implicitHeight: contentHeight
+  Component.onCompleted: {
+    var target = Compositor.isNiri ? niriContentHolder : hyprContentHolder
+    contentEnvelope.parent = target
+    contentEnvelope.anchors.fill = target
+  }
 
   onOpenChanged: {
     if (!bar) return
@@ -76,31 +90,173 @@ PopupWindow {
     else if (bar.activePopout === coordinatorKey) bar.releasePopout(coordinatorKey)
   }
 
-  // Outside-click dismissal via Hyprland's focus grab. While `active`, input
-  // is routed only to the listed windows; clicking anywhere else clears the
-  // grab and we close the popup. Skipped for hover-mode popups so the cursor
-  // can move freely between the trigger and the popup.
-  HyprlandFocusGrab {
-    active: root.open && root.triggerMode === "click" && !Compositor.isNiri
-    windows: root.anchorWindow ? [root, root.anchorWindow] : [root]
-    onCleared: root.close()
+  // ---------------------------------------------------------- Hyprland path
+
+  PopupWindow {
+    id: hyprPopup
+    visible: !Compositor.isNiri && (root.open || hyprCard.opacity > 0)
+    color: "transparent"
+    implicitWidth: root.contentWidth
+    implicitHeight: root.contentHeight
+
+    // Outside-click dismissal via Hyprland's focus grab. While `active`, input
+    // is routed only to the listed windows; clicking anywhere else clears the
+    // grab and we close the popup. Skipped for hover-mode popups so the cursor
+    // can move freely between the trigger and the popup.
+    HyprlandFocusGrab {
+      active: root.open && root.triggerMode === "click" && !Compositor.isNiri
+      windows: root.anchorWindow ? [hyprPopup, root.anchorWindow] : [hyprPopup]
+      onCleared: root.close()
+    }
+
+    anchor {
+      id: popupAnchor
+      window: root.anchorItem ? root.anchorItem.QsWindow.window : null
+      adjustment: PopupAdjustment.Slide
+      edges: Edges.Top | Edges.Left
+      gravity: Edges.Bottom | Edges.Right
+      rect.width: 1
+      rect.height: 1
+
+      onAnchoring: {
+        if (!root.anchorItem || !root.bar) return
+
+        var target = root.anchorItem
+        var popupWidth = hyprPopup.implicitWidth
+        var popupHeight = hyprPopup.implicitHeight
+        var localX = target.width / 2 - popupWidth / 2
+        var localY = target.height + root.margin
+
+        if (root.bar.position === "bottom") {
+          localY = -popupHeight - root.margin
+        } else if (root.bar.position === "left") {
+          localX = target.width + root.margin
+          localY = target.height / 2 - popupHeight / 2
+        } else if (root.bar.position === "right") {
+          localX = -popupWidth - root.margin
+          localY = target.height / 2 - popupHeight / 2
+        }
+
+        var window = target.QsWindow.window
+        if (!window) return
+
+        if (root.centerOnBar) {
+          var cx = 0;
+          var cy = 0;
+          if (root.bar.position === "top" || root.bar.position === "bottom") {
+            cx = window.width / 2 - popupWidth / 2
+            cy = root.bar.position === "bottom" ? -popupHeight - root.margin : window.height + root.margin
+            cx = Math.max(root.margin, Math.min(cx, window.width - popupWidth - root.margin))
+          } else {
+            cx = root.bar.position === "left" ? window.width + root.margin : -popupWidth - root.margin
+            cy = window.height / 2 - popupHeight / 2
+            cy = Math.max(root.margin, Math.min(cy, window.height - popupHeight - root.margin))
+          }
+
+          popupAnchor.rect.x = Math.round(cx)
+          popupAnchor.rect.y = Math.round(cy)
+          return
+        }
+
+        var point = window.contentItem.mapFromItem(target, localX, localY)
+
+        if (root.bar.position === "top" || root.bar.position === "bottom") {
+          point.x = Math.max(root.margin, Math.min(point.x, window.width - popupWidth - root.margin))
+        } else {
+          point.y = Math.max(root.margin, Math.min(point.y, window.height - popupHeight - root.margin))
+        }
+
+        popupAnchor.rect.x = Math.round(point.x)
+        popupAnchor.rect.y = Math.round(point.y)
+      }
+    }
+
+    BorderSurface {
+      id: hyprCard
+      anchors.fill: parent
+      color: Color.popups.background
+      borderSpec: root.borderSpec
+      padding: root.padding
+      radius: Style.cornerRadius
+      opacity: root.open ? 1.0 : 0
+
+      Behavior on opacity {
+        NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+      }
+
+      Item {
+        id: hyprContentHolder
+        anchors.fill: parent
+        anchors.topMargin: hyprCard.contentTopInset
+        anchors.rightMargin: hyprCard.contentRightInset
+        anchors.bottomMargin: hyprCard.contentBottomInset
+        anchors.leftMargin: hyprCard.contentLeftInset
+      }
+
+      HoverHandler {
+        id: cardHover
+      }
+    }
   }
 
-  anchor {
-    id: popupAnchor
-    window: anchorItem ? anchorItem.QsWindow.window : null
-    adjustment: PopupAdjustment.Slide
-    edges: Edges.Top | Edges.Left
-    gravity: Edges.Bottom | Edges.Right
-    rect.width: 1
-    rect.height: 1
+  // -------------------------------------------------------------- Niri path
+  //
+  // Niri has no HyprlandFocusGrab equivalent. Rather than a separate
+  // click-catching surface (which stacks below/above the popup ambiguously
+  // depending on layer-shell rules), the card and the dismiss overlay are
+  // the SAME surface here — the same principle shell/Ui/KeyboardPanel.qml
+  // already relies on. This sidesteps any stacking-order question entirely:
+  // a click on the card is caught by the card's own MouseArea (swallowed
+  // before it reaches the full-screen dismiss MouseArea behind it), and a
+  // click anywhere else in this same surface closes the popup. No manual
+  // click-forwarding is needed for the bar strip: a real Region/Subtract
+  // mask punches a genuine Wayland click-through hole there, safe because
+  // this never requests Exclusive keyboard focus (the thing that makes
+  // Hyprland hijack compositor-wide pointer routing, which is what forces
+  // KeyboardPanel.qml to forward clicks manually instead).
 
-    onAnchoring: {
-      if (!root.anchorItem || !root.bar) return
+  PanelWindow {
+    id: niriPopup
+    visible: Compositor.isNiri && (root.open || niriCard.opacity > 0)
+    screen: root.popupScreen
+    color: "transparent"
+    exclusionMode: ExclusionMode.Ignore
+    WlrLayershell.namespace: "omarchy-popup"
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+
+    anchors { top: true; bottom: true; left: true; right: true }
+
+    readonly property string barPos: root.bar ? root.bar.position : "top"
+    readonly property int barSize: root.bar ? root.bar.barSize : 0
+    readonly property bool barVertical: barPos === "left" || barPos === "right"
+
+    mask: Region {
+      width: niriPopup.width
+      height: niriPopup.height
+
+      Region {
+        intersection: Intersection.Subtract
+        x: niriPopup.barPos === "right" ? niriPopup.width - niriPopup.barSize : 0
+        y: niriPopup.barPos === "bottom" ? niriPopup.height - niriPopup.barSize : 0
+        width: niriPopup.barVertical ? niriPopup.barSize : niriPopup.width
+        height: niriPopup.barVertical ? niriPopup.height : niriPopup.barSize
+      }
+    }
+
+    MouseArea {
+      anchors.fill: parent
+      acceptedButtons: Qt.AllButtons
+      enabled: root.open
+      onClicked: root.close()
+    }
+
+    readonly property point cardOrigin: {
+      if (!root.anchorItem || !root.bar || !root.anchorWindow) return Qt.point(root.margin, root.margin)
 
       var target = root.anchorItem
-      var popupWidth = root.implicitWidth
-      var popupHeight = root.implicitHeight
+      var popupWidth = root.contentWidth
+      var popupHeight = root.contentHeight
       var localX = target.width / 2 - popupWidth / 2
       var localY = target.height + root.margin
 
@@ -114,28 +270,18 @@ PopupWindow {
         localY = target.height / 2 - popupHeight / 2
       }
 
-      var window = target.QsWindow.window
-      if (!window) return
+      var window = root.anchorWindow
+      var point = window.contentItem.mapFromItem(target, localX, localY)
 
       if (root.centerOnBar) {
-        var cx = 0;
-        var cy = 0;
         if (root.bar.position === "top" || root.bar.position === "bottom") {
-          cx = window.width / 2 - popupWidth / 2
-          cy = root.bar.position === "bottom" ? -popupHeight - root.margin : window.height + root.margin
-          cx = Math.max(root.margin, Math.min(cx, window.width - popupWidth - root.margin))
+          point.x = window.width / 2 - popupWidth / 2
+          point.y = root.bar.position === "bottom" ? window.height - popupHeight - root.margin : root.margin + window.height
         } else {
-          cx = root.bar.position === "left" ? window.width + root.margin : -popupWidth - root.margin
-          cy = window.height / 2 - popupHeight / 2
-          cy = Math.max(root.margin, Math.min(cy, window.height - popupHeight - root.margin))
+          point.x = root.bar.position === "left" ? window.width + root.margin : window.width - popupWidth - root.margin
+          point.y = window.height / 2 - popupHeight / 2
         }
-
-        popupAnchor.rect.x = Math.round(cx)
-        popupAnchor.rect.y = Math.round(cy)
-        return
       }
-
-      var point = window.contentItem.mapFromItem(target, localX, localY)
 
       if (root.bar.position === "top" || root.bar.position === "bottom") {
         point.x = Math.max(root.margin, Math.min(point.x, window.width - popupWidth - root.margin))
@@ -143,57 +289,69 @@ PopupWindow {
         point.y = Math.max(root.margin, Math.min(point.y, window.height - popupHeight - root.margin))
       }
 
-      popupAnchor.rect.x = Math.round(point.x)
-      popupAnchor.rect.y = Math.round(point.y)
+      return Qt.point(Math.round(point.x), Math.round(point.y))
+    }
+
+    BorderSurface {
+      id: niriCard
+      x: niriPopup.cardOrigin.x
+      y: niriPopup.cardOrigin.y
+      width: root.contentWidth
+      height: root.contentHeight
+      color: Color.popups.background
+      borderSpec: root.borderSpec
+      padding: root.padding
+      radius: Style.cornerRadius
+      opacity: root.open ? 1.0 : 0
+
+      Behavior on opacity {
+        NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+      }
+
+      // Swallow clicks on the card so they don't fall through to the
+      // full-screen dismiss MouseArea behind it.
+      MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.AllButtons
+      }
+
+      Item {
+        id: niriContentHolder
+        anchors.fill: parent
+        anchors.topMargin: niriCard.contentTopInset
+        anchors.rightMargin: niriCard.contentRightInset
+        anchors.bottomMargin: niriCard.contentBottomInset
+        anchors.leftMargin: niriCard.contentLeftInset
+      }
+
+      HoverHandler {
+        id: niriCardHover
+      }
     }
   }
 
-  // Niri has no HyprlandFocusGrab equivalent. Cover every output with a
-  // transparent, click-catching layer-shell surface instead — the same
-  // primitive shell/Ui/KeyboardPanel.qml already uses successfully. Unlike
-  // that file, no manual click-forwarding is needed: this never requests
-  // Exclusive keyboard focus (the thing that makes Hyprland hijack
-  // compositor-wide pointer routing), so a real masked click-through for
-  // each output's own bar strip is enough to let bar clicks reach the bar
-  // normally.
+  // Other-output twins (Niri only): plain click-catchers, no bar-strip
+  // exclusion needed since there's no card to protect on these screens, and
+  // today's Hyprland behavior (HyprlandFocusGrab) also treats a click on a
+  // different monitor's bar as an "outside" click that dismisses.
   Variants {
-    model: (root.open && root.triggerMode === "click" && Compositor.isNiri) ? Quickshell.screens : []
+    model: (root.open && root.triggerMode === "click" && Compositor.isNiri && root.popupScreen)
+      ? Quickshell.screens.filter(function(s) { return s.name !== root.popupScreen.name })
+      : []
 
     delegate: Component {
       PanelWindow {
-        id: dismissCatcher
         required property var modelData
 
         screen: modelData
         visible: true
         color: "transparent"
         exclusionMode: ExclusionMode.Ignore
-        WlrLayershell.namespace: "omarchy-popup-dismiss"
+        WlrLayershell.namespace: "omarchy-popup-dismiss-twin"
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
         anchors { top: true; bottom: true; left: true; right: true }
-
-        readonly property string barPos: root.bar ? root.bar.position : "top"
-        readonly property int barSize: root.bar ? root.bar.barSize : 0
-        readonly property bool barVertical: barPos === "left" || barPos === "right"
-
-        // Punch a click-through hole for this output's own bar strip so
-        // bar clicks reach the bar surface underneath instead of being
-        // caught here. See region.hpp's own documented Region-nesting
-        // example for this exact subtract pattern.
-        mask: Region {
-          width: dismissCatcher.width
-          height: dismissCatcher.height
-
-          Region {
-            intersection: Intersection.Subtract
-            x: dismissCatcher.barPos === "right" ? dismissCatcher.width - dismissCatcher.barSize : 0
-            y: dismissCatcher.barPos === "bottom" ? dismissCatcher.height - dismissCatcher.barSize : 0
-            width: dismissCatcher.barVertical ? dismissCatcher.barSize : dismissCatcher.width
-            height: dismissCatcher.barVertical ? dismissCatcher.height : dismissCatcher.barSize
-          }
-        }
 
         MouseArea {
           anchors.fill: parent
@@ -201,33 +359,6 @@ PopupWindow {
           onClicked: root.close()
         }
       }
-    }
-  }
-
-  BorderSurface {
-    id: card
-    anchors.fill: parent
-    color: Color.popups.background
-    borderSpec: root.borderSpec
-    padding: root.padding
-    radius: Style.cornerRadius
-    opacity: root.open ? 1.0 : 0
-
-    Behavior on opacity {
-      NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
-    }
-
-    Item {
-      id: contentHolder
-      anchors.fill: parent
-      anchors.topMargin: card.contentTopInset
-      anchors.rightMargin: card.contentRightInset
-      anchors.bottomMargin: card.contentBottomInset
-      anchors.leftMargin: card.contentLeftInset
-    }
-
-    HoverHandler {
-      id: cardHover
     }
   }
 }
