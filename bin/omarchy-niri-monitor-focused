@@ -2,4 +2,4 @@
 
 # omarchy:summary=Print the name of the currently focused Niri output.
 
-niri msg -j focused-output | jq -r '.name'
+niri msg -j focused-output | jq -r '.name // empty'

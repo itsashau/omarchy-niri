@@ -287,7 +287,10 @@ Item {
 
   readonly property var niriService: root.shell ? root.shell.firstPartyServiceFor("omarchy.niri") : null
 
-  function handleNiriWindowOpened(window) {
+  // niri emits WindowOpenedOrChanged for both newly opened windows and
+  // changes to existing ones (title, workspace, size, etc.), so this can
+  // fire more than once per window's lifetime.
+  function handleNiriWindowOpenedOrChanged(window) {
     if (!window) return
     if (String(window.app_id || "") === root.screensaverClass) {
       root.handleScreensaverWindowOpened(String(window.id))
@@ -302,7 +305,7 @@ Item {
   Connections {
     target: root.niriService
     enabled: !!root.niriService
-    function onWindowOpened(window) { root.handleNiriWindowOpened(window) }
+    function onWindowOpenedOrChanged(window) { root.handleNiriWindowOpenedOrChanged(window) }
     function onWindowClosed(id) { root.handleNiriWindowClosed(id) }
   }
 

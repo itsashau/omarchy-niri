@@ -56,8 +56,10 @@ if [[ -z ${NIRI_SOCKET:-} ]]; then
   exec {events}< <(socat -U - "UNIX-CONNECT:$SOCKET")
 fi
 
+niri_seen_screensaver_ids=""
+
 if [[ -n ${NIRI_SOCKET:-} ]]; then
-  exec {niri_events}< <(printf '"EventStream"\n' | socat -U - "UNIX-CONNECT:$NIRI_SOCKET")
+  exec {niri_events}< <(niri msg -j event-stream)
 fi
 
 # hypr_exec is async and a new window maps on whatever monitor is focused at that
@@ -72,9 +74,13 @@ wait_for_screensaver_window() {
 }
 
 wait_for_niri_screensaver_window() {
-  local line deadline=$((SECONDS + 5))
+  local line id deadline=$((SECONDS + 5))
   while ((SECONDS < deadline)) && IFS= read -r -t $((deadline - SECONDS)) -u "$niri_events" line; do
-    [[ $(jq -r '.WindowOpenedOrChanged.window.app_id // empty' <<<"$line" 2>/dev/null) == "org.omarchy.screensaver" ]] && return 0
+    id=$(jq -r 'select(.WindowOpenedOrChanged.window.app_id == "org.omarchy.screensaver") | .WindowOpenedOrChanged.window.id' <<<"$line" 2>/dev/null)
+    if [[ -n $id ]] && [[ " $niri_seen_screensaver_ids " != *" $id "* ]]; then
+      niri_seen_screensaver_ids+=" $id"
+      return 0
+    fi
   done
 }
 

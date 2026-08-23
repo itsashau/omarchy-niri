@@ -15,7 +15,7 @@ Item {
   property string lastEvent: "init"
   property string lastEventAt: ""
 
-  signal windowOpened(var window)
+  signal windowOpenedOrChanged(var window)
   signal windowClosed(int id)
 
   function logEvent(event, details) {
@@ -164,7 +164,7 @@ Item {
     next[w.id] = w
     root.windowsById = next
     root.recomputeOccupiedFromWindows()
-    root.windowOpened(w)
+    root.windowOpenedOrChanged(w)
   }
 
   function handleWindowClosed(data) {
