@@ -65,6 +65,7 @@ Item {
   property var workspaces: []
   property int focusedWorkspaceId: -1
   property string focusedOutputName: ""
+  property var occupiedWorkspaceIds: ({})
 
   function normalizeWorkspace(ws) {
     return {
@@ -133,10 +134,36 @@ Item {
     root.sendRequest({ "Action": { "FocusWorkspace": { "reference": { "Id": id } } } })
   }
 
+  function recomputeOccupied(windowList) {
+    var next = {}
+    for (var i = 0; i < windowList.length; i++) {
+      var wsId = windowList[i].workspace_id
+      if (wsId !== null && wsId !== undefined) next[wsId] = true
+    }
+    root.occupiedWorkspaceIds = next
+    // Workspaces' occupied flags were computed against the old map —
+    // refresh them in place without waiting for the next WorkspacesChanged.
+    var updated = []
+    for (var j = 0; j < root.workspaces.length; j++) {
+      var ws = root.workspaces[j]
+      updated.push({
+        id: ws.id, idx: ws.idx, output: ws.output,
+        isActive: ws.isActive, isFocused: ws.isFocused,
+        occupied: next[ws.id] === true
+      })
+    }
+    root.workspaces = updated
+  }
+
+  function handleWindowsChanged(data) {
+    root.recomputeOccupied(data.windows || [])
+  }
+
   function handleNiriEvent(event) {
     if (!event) return
     if (event.WorkspacesChanged) { root.handleWorkspacesChanged(event.WorkspacesChanged); return }
     if (event.WorkspaceActivated) { root.handleWorkspaceActivated(event.WorkspaceActivated); return }
+    if (event.WindowsChanged) { root.handleWindowsChanged(event.WindowsChanged); return }
     root.logEvent("event", Object.keys(event)[0] || "unknown")
   }
 
