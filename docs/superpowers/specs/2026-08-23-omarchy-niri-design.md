@@ -134,15 +134,29 @@ for muscle memory. Window-management keys use Niri's own idioms (column
 focus/move/consume/expel) rather than forcing a grid-resize model that
 doesn't exist in Niri.
 
-### 5. Known open risk
+### 5. Known open risk (resolved, and a new one found in its place)
 
 Omarchy 4.0 moved lock-screen and idle handling into the Quickshell
-process itself. It is not yet confirmed whether idle detection is
-implemented against the standard `ext-idle-notify-v1` Wayland protocol
-(which Niri supports, and which would mean idle "just works" under Niri)
-or against Hyprland-specific IPC (which would require a Niri-specific idle
-path). This is a spike to run early in implementation, not a design
-decision to resolve now.
+process itself. **Settled by the idle/lock parity implementation
+(2026-08-23):** idle-timeout detection itself already uses the standard
+`ext-idle-notify-v1` Wayland protocol (which Niri supports), so it needed
+no changes at all. The only Hyprland-specific piece was screensaver-window
+tracking (raw Hyprland IPC events, used only to know whether the
+screensaver is currently mapped) and the screensaver launcher script
+itself (per-monitor focus + a raw Hyprland-socket wait) — both now have a
+working Niri path.
+
+**New risk found during that same work, not yet resolved:** an
+`ext-session-lock-v1` lock whose client dies leaves the session stuck
+locked with no live client to unlock it — confirmed to reproduce
+identically on both Hyprland and Niri (a universal protocol safety
+behavior, not a Hyprland-specific bug as originally assumed).
+Omarchy's existing recovery for this (`bin/omarchy-hyprland-session-locked`)
+detects the stuck state via Hyprland's own `solitaryBlockedBy` monitor
+state — niri's IPC has no equivalent session-lock-status query at all, so
+this recovery has no Niri port yet. A future plan needs to design a
+detection mechanism from scratch (e.g. a defensive re-lock probe rather
+than a state query), not port the existing technique.
 
 ## Phasing
 

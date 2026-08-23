@@ -566,12 +566,14 @@ limitation already noted elsewhere in this project's memory.
 
 ## What comes after this plan
 
-If Task 1's spike found niri DOES have an orphaned-lock problem: a future
-plan needs to design an actual detection mechanism from scratch, since
-niri's IPC has nothing to query for it — this might mean a different
-approach entirely (e.g., a defensive one-time re-lock probe at shell
-startup rather than a state query), not a straightforward port of
-`omarchy-hyprland-session-locked`'s technique.
+**Confirmed by Task 1's spike: niri DOES have the orphaned-lock problem.**
+Reproduced identically on both compositors (lock the session, kill the
+shell process from a separate TTY, observe the lock screen stay stuck
+with no live client). A future plan needs to design an actual detection
+mechanism from scratch, since niri's IPC has nothing to query for it —
+this might mean a different approach entirely (e.g., a defensive
+one-time re-lock probe at shell startup rather than a state query), not
+a straightforward port of `omarchy-hyprland-session-locked`'s technique.
 
 Otherwise, per the discussed breakdown: the smaller independent items next
 ("3d"): notifications' focus-by-class (`omarchy-hyprland-focus-app`),
