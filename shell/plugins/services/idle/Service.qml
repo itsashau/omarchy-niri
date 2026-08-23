@@ -285,6 +285,27 @@ Item {
     function onRawEvent(event) { root.handleHyprlandEvent(event) }
   }
 
+  readonly property var niriService: root.shell ? root.shell.firstPartyServiceFor("omarchy.niri") : null
+
+  function handleNiriWindowOpened(window) {
+    if (!window) return
+    if (String(window.app_id || "") === root.screensaverClass) {
+      root.handleScreensaverWindowOpened(String(window.id))
+    }
+  }
+
+  function handleNiriWindowClosed(id) {
+    var address = String(id)
+    if (root.screensaverWindows[address]) root.handleScreensaverWindowClosed(address)
+  }
+
+  Connections {
+    target: root.niriService
+    enabled: !!root.niriService
+    function onWindowOpened(window) { root.handleNiriWindowOpened(window) }
+    function onWindowClosed(id) { root.handleNiriWindowClosed(id) }
+  }
+
   Process {
     id: screensaverProcess
     onExited: function(exitCode, exitStatus) { root.logEvent("process-exit", "screensaver exitCode=" + exitCode + " status=" + exitStatus) }
