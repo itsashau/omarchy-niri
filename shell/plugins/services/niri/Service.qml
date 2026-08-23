@@ -100,6 +100,26 @@ Item {
   property var occupiedWorkspaceIds: ({})
   property var windowsById: ({})
 
+  property var keyboardLayoutNames: []
+  property int keyboardLayoutCurrentIdx: 0
+
+  function applyKeyboardLayouts(data) {
+    root.keyboardLayoutNames = (data && data.names) || []
+    root.keyboardLayoutCurrentIdx = (data && data.current_idx !== undefined) ? data.current_idx : 0
+  }
+
+  function handleKeyboardLayoutsChanged(data) {
+    root.applyKeyboardLayouts(data.keyboard_layouts)
+  }
+
+  function handleKeyboardLayoutSwitched(data) {
+    if (data && data.idx !== undefined) root.keyboardLayoutCurrentIdx = data.idx
+  }
+
+  function switchLayout() {
+    root.sendRequest({ "Action": { "SwitchLayout": { "layout": "Next" } } })
+  }
+
   function applyWorkspaceList(list) {
     var result = NiriModel.applyWorkspaceList(list, root.occupiedWorkspaceIds)
     root.workspaces = result.workspaces
@@ -183,6 +203,8 @@ Item {
     if (event.WindowsChanged) { root.handleWindowsChanged(event.WindowsChanged); return }
     if (event.WindowOpenedOrChanged) { root.handleWindowOpenedOrChanged(event.WindowOpenedOrChanged); return }
     if (event.WindowClosed) { root.handleWindowClosed(event.WindowClosed); return }
+    if (event.KeyboardLayoutsChanged) { root.handleKeyboardLayoutsChanged(event.KeyboardLayoutsChanged); return }
+    if (event.KeyboardLayoutSwitched) { root.handleKeyboardLayoutSwitched(event.KeyboardLayoutSwitched); return }
     root.logEvent("event", Object.keys(event)[0] || "unknown")
   }
 
