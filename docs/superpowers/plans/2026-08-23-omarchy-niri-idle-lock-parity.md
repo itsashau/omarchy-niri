@@ -334,22 +334,29 @@ identically here since it's the same service.
 - Modify: `bin/omarchy-launch-screensaver`
 - Create: `bin/omarchy-niri-monitor-focused`
 
-- [ ] **Step 1: Confirm niri's exact CLI syntax for the two actions this needs**
+- [x] **Step 1: Confirm niri's exact CLI syntax for the two actions this needs — DONE**
 
-In the VM (Niri session), run:
-```bash
-niri msg action --help
-niri msg action focus-monitor --help
-niri msg action spawn --help
+Confirmed live in the VM:
 ```
-Confirm the exact flag names (this plan's Step 2 code assumes
-`niri msg action focus-monitor --output <name>` and
-`niri msg action spawn -- <cmd> <args...>`, based on the `niri-ipc` crate's
-`Action::FocusMonitor { output: String }` and `Action::Spawn` variants
-fetched during this plan's design — niri's CLI parser conventionally
-kebab-cases enum variant names, but confirm rather than assume before
-relying on it in a script with no type-checking safety net). Adjust Step
-2's code if the actual flags differ from what's written there.
+$ niri msg action focus-monitor --help
+Usage: niri msg action focus-monitor <OUTPUT>
+```
+`<OUTPUT>` is **positional**, not a `--output` flag (the plan's original
+guess, based on the Rust `Action::FocusMonitor { output: String }`
+field name, was wrong — niri's CLI doesn't turn every struct field into a
+named flag). Correct invocation: `niri msg action focus-monitor "$1"`.
+
+```
+$ niri msg action spawn --help
+Usage: niri msg action spawn -- <COMMAND>...
+```
+This one matches the original plan exactly: `niri msg action spawn -- "$@"`.
+
+Also confirmed the two `-j` JSON shapes Step 4 below depends on:
+`niri msg -j outputs` returns an object keyed by output name (e.g.
+`{"Virtual-1": {"name": "Virtual-1", ...}}`) — `jq -r 'keys[]'` is
+correct. `niri msg -j focused-output` returns a single output object
+directly with a top-level `"name"` field — `jq -r '.name'` is correct.
 
 - [ ] **Step 2: Add the Niri-path functions**
 
@@ -369,7 +376,7 @@ hypr_exec() {
 Add, as siblings (do not modify the `hypr_*` functions):
 ```bash
 niri_focus_monitor() {
-  niri msg action focus-monitor --output "$1" >/dev/null 2>&1
+  niri msg action focus-monitor "$1" >/dev/null 2>&1
 }
 
 niri_exec() {
