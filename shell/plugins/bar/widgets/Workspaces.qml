@@ -23,6 +23,7 @@ BarWidget {
     for (var i = 0; i < values.length; i++) {
       if (values[i].id === id) return values[i]
     }
+
     return null
   }
 
@@ -79,7 +80,7 @@ BarWidget {
           : (Hyprland.focusedWorkspace !== null && Hyprland.focusedWorkspace.id === modelData)
 
         bar: root.bar
-        text: focused ? "\uDB85\uDCFB" : (modelData === 10 ? "0" : String(modelData))
+        text: focused ? "\uDB85\uDCFB" : (root.niriActive ? String(workspace ? workspace.idx : modelData) : (modelData === 10 ? "0" : String(modelData)))
         opacity: occupied || focused ? 1 : 0.5
         horizontalMargin: 6
         verticalPadding: 6

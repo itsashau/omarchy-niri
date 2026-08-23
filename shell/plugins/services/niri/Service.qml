@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "NiriModel.js" as NiriModel
 
 Item {
   id: root
@@ -21,6 +22,23 @@ Item {
     console.log("omarchy niri " + root.lastEventAt + " " + root.lastEvent)
   }
 
+  // niri serves one request per connection, then closes it. Both sockets
+  // need to reconnect after every close (a request/response, or a dropped
+  // event stream) as long as the service is still active.
+  Timer {
+    id: requestReconnectTimer
+    interval: 200
+    repeat: false
+    onTriggered: if (root.active) requestSocket.connected = true
+  }
+
+  Timer {
+    id: eventReconnectTimer
+    interval: 500
+    repeat: false
+    onTriggered: if (root.active) eventSocket.connected = true
+  }
+
   Socket {
     id: eventSocket
     path: root.niriSocketPath
@@ -33,6 +51,7 @@ Item {
         flush()
       } else if (root.active) {
         root.logEvent("event-stream-disconnected")
+        eventReconnectTimer.restart()
       }
     }
 
@@ -54,10 +73,20 @@ Item {
     id: requestSocket
     path: root.niriSocketPath
     connected: root.active
+
+    onConnectionStateChanged: {
+      if (!connected && root.active) {
+        root.logEvent("request-socket-disconnected")
+        requestReconnectTimer.restart()
+      }
+    }
   }
 
   function sendRequest(request) {
-    if (!requestSocket.connected) return
+    if (!requestSocket.connected) {
+      root.logEvent("request-dropped", JSON.stringify(request))
+      return
+    }
     requestSocket.write(JSON.stringify(request) + "\n")
     requestSocket.flush()
   }
@@ -66,97 +95,80 @@ Item {
   property int focusedWorkspaceId: -1
   property string focusedOutputName: ""
   property var occupiedWorkspaceIds: ({})
-
-  function normalizeWorkspace(ws) {
-    return {
-      id: ws.id,
-      idx: ws.idx,
-      output: ws.output || "",
-      isActive: ws.is_active === true,
-      isFocused: ws.is_focused === true,
-      occupied: root.occupiedWorkspaceIds[ws.id] === true
-    }
-  }
+  property var windowsById: ({})
 
   function applyWorkspaceList(list) {
-    var next = []
-    var focusedId = -1
-    var focusedOutput = ""
-    for (var i = 0; i < list.length; i++) {
-      var normalized = root.normalizeWorkspace(list[i])
-      next.push(normalized)
-      if (normalized.isFocused) {
-        focusedId = normalized.id
-        focusedOutput = normalized.output
-      }
-    }
-    next.sort(function(a, b) { return a.idx - b.idx })
-    root.workspaces = next
-    root.focusedWorkspaceId = focusedId
-    root.focusedOutputName = focusedOutput
+    var result = NiriModel.applyWorkspaceList(list, root.occupiedWorkspaceIds)
+    root.workspaces = result.workspaces
+    root.focusedWorkspaceId = result.focusedWorkspaceId
+    root.focusedOutputName = result.focusedOutputName
   }
 
   function handleWorkspacesChanged(data) {
     root.applyWorkspaceList(data.workspaces || [])
   }
 
-  // WorkspaceActivated does not resend the full list — patch is_active
-  // (scoped to the affected output) and is_focused (global) locally.
   function handleWorkspaceActivated(data) {
-    var activatedId = data.id
-    var affectedOutput = ""
-    var found = false
-    for (var i = 0; i < root.workspaces.length; i++) {
-      if (root.workspaces[i].id === activatedId) { affectedOutput = root.workspaces[i].output; found = true; break }
-    }
-    if (!found) return
-
-    var next = []
-    var focusedId = data.focused ? -1 : root.focusedWorkspaceId
-    var focusedOutput = data.focused ? "" : root.focusedOutputName
-    for (var j = 0; j < root.workspaces.length; j++) {
-      var ws = root.workspaces[j]
-      var copy = {
-        id: ws.id, idx: ws.idx, output: ws.output,
-        isActive: ws.output === affectedOutput ? ws.id === activatedId : ws.isActive,
-        isFocused: data.focused ? ws.id === activatedId : ws.isFocused,
-        occupied: ws.occupied
-      }
-      if (copy.isFocused) { focusedId = copy.id; focusedOutput = copy.output }
-      next.push(copy)
-    }
-    root.workspaces = next
-    root.focusedWorkspaceId = focusedId
-    root.focusedOutputName = focusedOutput
+    var result = NiriModel.patchWorkspaceActivated(root.workspaces, data, root.focusedWorkspaceId, root.focusedOutputName)
+    root.workspaces = result.workspaces
+    root.focusedWorkspaceId = result.focusedWorkspaceId
+    root.focusedOutputName = result.focusedOutputName
   }
 
   function focusWorkspace(id) {
     root.sendRequest({ "Action": { "FocusWorkspace": { "reference": { "Id": id } } } })
   }
 
-  function recomputeOccupied(windowList) {
-    var next = {}
-    for (var i = 0; i < windowList.length; i++) {
-      var wsId = windowList[i].workspace_id
-      if (wsId !== null && wsId !== undefined) next[wsId] = true
-    }
-    root.occupiedWorkspaceIds = next
-    // Workspaces' occupied flags were computed against the old map —
-    // refresh them in place without waiting for the next WorkspacesChanged.
+  // Workspaces' occupied flags were computed against the old map —
+  // refresh them in place without waiting for the next WorkspacesChanged.
+  function refreshWorkspaceOccupied() {
     var updated = []
     for (var j = 0; j < root.workspaces.length; j++) {
       var ws = root.workspaces[j]
       updated.push({
         id: ws.id, idx: ws.idx, output: ws.output,
         isActive: ws.isActive, isFocused: ws.isFocused,
-        occupied: next[ws.id] === true
+        occupied: root.occupiedWorkspaceIds[ws.id] === true
       })
     }
     root.workspaces = updated
   }
 
+  function recomputeOccupiedFromWindows() {
+    root.occupiedWorkspaceIds = NiriModel.occupiedIdsFromWindows(root.windowsById)
+    root.refreshWorkspaceOccupied()
+  }
+
+  // WindowsChanged is the initial snapshot only. It replaces windowsById
+  // wholesale; incremental updates arrive afterwards as WindowOpenedOrChanged
+  // / WindowClosed and patch windowsById in place (see below).
   function handleWindowsChanged(data) {
-    root.recomputeOccupied(data.windows || [])
+    var windows = data.windows || []
+    var next = {}
+    for (var i = 0; i < windows.length; i++) {
+      var w = windows[i]
+      if (w && w.id !== undefined) next[w.id] = w
+    }
+    root.windowsById = next
+    root.recomputeOccupiedFromWindows()
+  }
+
+  function handleWindowOpenedOrChanged(data) {
+    var w = data.window
+    if (!w || w.id === undefined) return
+    var next = {}
+    for (var id in root.windowsById) next[id] = root.windowsById[id]
+    next[w.id] = w
+    root.windowsById = next
+    root.recomputeOccupiedFromWindows()
+  }
+
+  function handleWindowClosed(data) {
+    if (data.id === undefined) return
+    var next = {}
+    for (var id in root.windowsById) if (Number(id) !== data.id) next[id] = root.windowsById[id]
+    root.windowsById = next
+    root.recomputeOccupiedFromWindows()
   }
 
   function handleNiriEvent(event) {
@@ -164,6 +176,8 @@ Item {
     if (event.WorkspacesChanged) { root.handleWorkspacesChanged(event.WorkspacesChanged); return }
     if (event.WorkspaceActivated) { root.handleWorkspaceActivated(event.WorkspaceActivated); return }
     if (event.WindowsChanged) { root.handleWindowsChanged(event.WindowsChanged); return }
+    if (event.WindowOpenedOrChanged) { root.handleWindowOpenedOrChanged(event.WindowOpenedOrChanged); return }
+    if (event.WindowClosed) { root.handleWindowClosed(event.WindowClosed); return }
     root.logEvent("event", Object.keys(event)[0] || "unknown")
   }
 
