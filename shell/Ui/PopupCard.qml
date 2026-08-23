@@ -251,45 +251,55 @@ Item {
       onClicked: root.close()
     }
 
+    // Reactive to the anchor moving along the bar (e.g. a widget's drawer
+    // reveal, a neighbouring widget resizing) — mapToItem alone is a
+    // one-shot and wouldn't re-fire on its own. Same technique
+    // KeyboardPanel.qml uses for its own full-screen-surface positioning.
+    TransformWatcher {
+      id: anchorWatcher
+      a: root.anchorWindow ? root.anchorWindow.contentItem : null
+      b: root.anchorItem
+    }
+
+    readonly property point anchorScreenPos: {
+      anchorWatcher.transform // reactive dependency
+      if (!root.anchorItem || !root.anchorWindow) return Qt.point(0, 0)
+      return root.anchorItem.mapToItem(root.anchorWindow.contentItem, 0, 0)
+    }
+    readonly property real anchorW: root.anchorItem ? root.anchorItem.width : 0
+    readonly property real anchorH: root.anchorItem ? root.anchorItem.height : 0
+
     readonly property point cardOrigin: {
       if (!root.anchorItem || !root.bar || !root.anchorWindow) return Qt.point(root.margin, root.margin)
 
-      var target = root.anchorItem
       var popupWidth = root.contentWidth
       var popupHeight = root.contentHeight
-      var localX = target.width / 2 - popupWidth / 2
-      var localY = target.height + root.margin
+      var barPos = root.bar.position
+      var x = 0, y = 0
 
-      if (root.bar.position === "bottom") {
-        localY = -popupHeight - root.margin
-      } else if (root.bar.position === "left") {
-        localX = target.width + root.margin
-        localY = target.height / 2 - popupHeight / 2
-      } else if (root.bar.position === "right") {
-        localX = -popupWidth - root.margin
-        localY = target.height / 2 - popupHeight / 2
+      if (root.centerOnBar && (barPos === "top" || barPos === "bottom")) {
+        x = root.screenW / 2 - popupWidth / 2
+        y = barPos === "bottom" ? root.screenH - root.barH - popupHeight - root.margin : root.barH + root.margin
+      } else if (root.centerOnBar) {
+        x = barPos === "left" ? root.barW + root.margin : root.screenW - root.barW - popupWidth - root.margin
+        y = root.screenH / 2 - popupHeight / 2
+      } else if (barPos === "bottom") {
+        x = niriPopup.anchorScreenPos.x + niriPopup.anchorW / 2 - popupWidth / 2
+        y = root.screenH - root.barH - popupHeight - root.margin
+      } else if (barPos === "left") {
+        x = root.barW + root.margin
+        y = niriPopup.anchorScreenPos.y + niriPopup.anchorH / 2 - popupHeight / 2
+      } else if (barPos === "right") {
+        x = root.screenW - root.barW - popupWidth - root.margin
+        y = niriPopup.anchorScreenPos.y + niriPopup.anchorH / 2 - popupHeight / 2
+      } else { // "top" (default)
+        x = niriPopup.anchorScreenPos.x + niriPopup.anchorW / 2 - popupWidth / 2
+        y = root.barH + root.margin
       }
 
-      var window = root.anchorWindow
-      var point = window.contentItem.mapFromItem(target, localX, localY)
-
-      if (root.centerOnBar) {
-        if (root.bar.position === "top" || root.bar.position === "bottom") {
-          point.x = window.width / 2 - popupWidth / 2
-          point.y = root.bar.position === "bottom" ? window.height - popupHeight - root.margin : root.margin + window.height
-        } else {
-          point.x = root.bar.position === "left" ? window.width + root.margin : window.width - popupWidth - root.margin
-          point.y = window.height / 2 - popupHeight / 2
-        }
-      }
-
-      if (root.bar.position === "top" || root.bar.position === "bottom") {
-        point.x = Math.max(root.margin, Math.min(point.x, window.width - popupWidth - root.margin))
-      } else {
-        point.y = Math.max(root.margin, Math.min(point.y, window.height - popupHeight - root.margin))
-      }
-
-      return Qt.point(Math.round(point.x), Math.round(point.y))
+      x = Math.max(root.margin, Math.min(x, root.screenW - popupWidth - root.margin))
+      y = Math.max(root.margin, Math.min(y, root.screenH - popupHeight - root.margin))
+      return Qt.point(Math.round(x), Math.round(y))
     }
 
     BorderSurface {
