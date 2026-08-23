@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland
+import Quickshell.Wayland
 import qs.Commons
 
 PopupWindow {
@@ -80,7 +81,7 @@ PopupWindow {
   // grab and we close the popup. Skipped for hover-mode popups so the cursor
   // can move freely between the trigger and the popup.
   HyprlandFocusGrab {
-    active: root.open && root.triggerMode === "click"
+    active: root.open && root.triggerMode === "click" && !Compositor.isNiri
     windows: root.anchorWindow ? [root, root.anchorWindow] : [root]
     onCleared: root.close()
   }
@@ -144,6 +145,62 @@ PopupWindow {
 
       popupAnchor.rect.x = Math.round(point.x)
       popupAnchor.rect.y = Math.round(point.y)
+    }
+  }
+
+  // Niri has no HyprlandFocusGrab equivalent. Cover every output with a
+  // transparent, click-catching layer-shell surface instead — the same
+  // primitive shell/Ui/KeyboardPanel.qml already uses successfully. Unlike
+  // that file, no manual click-forwarding is needed: this never requests
+  // Exclusive keyboard focus (the thing that makes Hyprland hijack
+  // compositor-wide pointer routing), so a real masked click-through for
+  // each output's own bar strip is enough to let bar clicks reach the bar
+  // normally.
+  Variants {
+    model: (root.open && root.triggerMode === "click" && Compositor.isNiri) ? Quickshell.screens : []
+
+    delegate: Component {
+      PanelWindow {
+        id: dismissCatcher
+        required property var modelData
+
+        screen: modelData
+        visible: true
+        color: "transparent"
+        exclusionMode: ExclusionMode.Ignore
+        WlrLayershell.namespace: "omarchy-popup-dismiss"
+        WlrLayershell.layer: WlrLayer.Overlay
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+
+        anchors { top: true; bottom: true; left: true; right: true }
+
+        readonly property string barPos: root.bar ? root.bar.position : "top"
+        readonly property int barSize: root.bar ? root.bar.barSize : 0
+        readonly property bool barVertical: barPos === "left" || barPos === "right"
+
+        // Punch a click-through hole for this output's own bar strip so
+        // bar clicks reach the bar surface underneath instead of being
+        // caught here. See region.hpp's own documented Region-nesting
+        // example for this exact subtract pattern.
+        mask: Region {
+          width: dismissCatcher.width
+          height: dismissCatcher.height
+
+          Region {
+            intersection: Intersection.Subtract
+            x: dismissCatcher.barPos === "right" ? dismissCatcher.width - dismissCatcher.barSize : 0
+            y: dismissCatcher.barPos === "bottom" ? dismissCatcher.height - dismissCatcher.barSize : 0
+            width: dismissCatcher.barVertical ? dismissCatcher.barSize : dismissCatcher.width
+            height: dismissCatcher.barVertical ? dismissCatcher.height : dismissCatcher.barSize
+          }
+        }
+
+        MouseArea {
+          anchors.fill: parent
+          acceptedButtons: Qt.AllButtons
+          onClicked: root.close()
+        }
+      }
     }
   }
 
