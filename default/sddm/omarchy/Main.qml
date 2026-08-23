@@ -9,13 +9,25 @@ Rectangle {
 
   property string currentUser: userModel.lastUser
   property bool loginFailed: false
-  property int sessionIndex: {
+  property int sessionIndex: -1
+
+  function defaultSessionIndex() {
     for (var i = 0; i < sessionModel.rowCount(); i++) {
       var name = (sessionModel.data(sessionModel.index(i, 0), Qt.DisplayRole) || "").toString()
       if (name.indexOf("uwsm") !== -1)
         return i
     }
     return sessionModel.lastIndex
+  }
+
+  function sessionName(i) {
+    return (sessionModel.data(sessionModel.index(i, 0), Qt.DisplayRole) || "").toString()
+  }
+
+  function cycleSession(delta) {
+    var count = sessionModel.rowCount()
+    if (count <= 0) return
+    root.sessionIndex = (root.sessionIndex + delta + count) % count
   }
 
   Connections {
@@ -105,13 +117,30 @@ Rectangle {
             if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
               sddm.login(root.currentUser, password.text, root.sessionIndex)
               event.accepted = true
+            } else if (event.key === Qt.Key_Left) {
+              root.cycleSession(-1)
+              event.accepted = true
+            } else if (event.key === Qt.Key_Right) {
+              root.cycleSession(1)
+              event.accepted = true
             }
           }
         }
       }
     }
 
+    Text {
+      anchors.horizontalCenter: parent.horizontalCenter
+      text: "‹ " + root.sessionName(root.sessionIndex) + " ›"
+      color: "#a9b1d6"
+      font.family: "JetBrainsMono Nerd Font"
+      font.pixelSize: 14
+    }
+
   }
 
-  Component.onCompleted: password.forceActiveFocus()
+  Component.onCompleted: {
+    root.sessionIndex = root.defaultSessionIndex()
+    password.forceActiveFocus()
+  }
 }

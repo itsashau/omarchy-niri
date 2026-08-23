@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Omarchy (Niri uwsm)
+Comment=Omarchy Niri session managed by uwsm
+Exec=uwsm start -g -1 -e -D niri niri.desktop
+TryExec=uwsm
+Type=Application
