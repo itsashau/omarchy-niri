@@ -395,14 +395,12 @@ Item {
     dismissPopup(index)
   }
 
-  // Try to focus an existing Hyprland window matching the notification's
-  // sender. The helper handles case-insensitive class matching.
+  // Try to focus an existing window matching the notification's sender.
+  // Routes through the appropriate helper for the compositor.
   function focusApp(entry) {
     if (!entry || !entry.app) return
-    focusAppProc.command = [
-      service.omarchyPath + "/bin/omarchy-hyprland-focus-app",
-      String(entry.app)
-    ]
+    var script = Compositor.isNiri ? "/bin/omarchy-niri-focus-app" : "/bin/omarchy-hyprland-focus-app"
+    focusAppProc.command = [service.omarchyPath + script, String(entry.app)]
     focusAppProc.running = true
   }
 
