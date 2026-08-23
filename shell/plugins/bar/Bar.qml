@@ -488,6 +488,8 @@ Item {
   // belongs. Empty until Hyprland reports one, which leaves panel routing on
   // its per-monitor fallback rather than guessing at an output.
   function focusedScreenName() {
+    var niriService = root.shell ? root.shell.firstPartyServiceFor("omarchy.niri") : null
+    if (niriService && niriService.active) return niriService.focusedOutputName
     var monitor = Hyprland.focusedMonitor
     return monitor ? String(monitor.name || "") : ""
   }
