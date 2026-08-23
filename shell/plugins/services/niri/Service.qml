@@ -15,6 +15,9 @@ Item {
   property string lastEvent: "init"
   property string lastEventAt: ""
 
+  signal windowOpened(var window)
+  signal windowClosed(int id)
+
   function logEvent(event, details) {
     var suffix = details === undefined || details === null || details === "" ? "" : ": " + String(details)
     root.lastEventAt = new Date().toISOString()
@@ -161,6 +164,7 @@ Item {
     next[w.id] = w
     root.windowsById = next
     root.recomputeOccupiedFromWindows()
+    root.windowOpened(w)
   }
 
   function handleWindowClosed(data) {
@@ -169,6 +173,7 @@ Item {
     for (var id in root.windowsById) if (Number(id) !== data.id) next[id] = root.windowsById[id]
     root.windowsById = next
     root.recomputeOccupiedFromWindows()
+    root.windowClosed(data.id)
   }
 
   function handleNiriEvent(event) {
