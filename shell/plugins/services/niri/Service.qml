@@ -62,9 +62,79 @@ Item {
     requestSocket.flush()
   }
 
+  property var workspaces: []
+  property int focusedWorkspaceId: -1
+  property string focusedOutputName: ""
+
+  function normalizeWorkspace(ws) {
+    return {
+      id: ws.id,
+      idx: ws.idx,
+      output: ws.output || "",
+      isActive: ws.is_active === true,
+      isFocused: ws.is_focused === true,
+      occupied: root.occupiedWorkspaceIds[ws.id] === true
+    }
+  }
+
+  function applyWorkspaceList(list) {
+    var next = []
+    var focusedId = -1
+    var focusedOutput = ""
+    for (var i = 0; i < list.length; i++) {
+      var normalized = root.normalizeWorkspace(list[i])
+      next.push(normalized)
+      if (normalized.isFocused) {
+        focusedId = normalized.id
+        focusedOutput = normalized.output
+      }
+    }
+    next.sort(function(a, b) { return a.idx - b.idx })
+    root.workspaces = next
+    root.focusedWorkspaceId = focusedId
+    root.focusedOutputName = focusedOutput
+  }
+
+  function handleWorkspacesChanged(data) {
+    root.applyWorkspaceList(data.workspaces || [])
+  }
+
+  // WorkspaceActivated does not resend the full list — patch is_active
+  // (scoped to the affected output) and is_focused (global) locally.
+  function handleWorkspaceActivated(data) {
+    var activatedId = data.id
+    var affectedOutput = ""
+    for (var i = 0; i < root.workspaces.length; i++) {
+      if (root.workspaces[i].id === activatedId) { affectedOutput = root.workspaces[i].output; break }
+    }
+
+    var next = []
+    var focusedId = data.focused ? -1 : root.focusedWorkspaceId
+    var focusedOutput = data.focused ? "" : root.focusedOutputName
+    for (var j = 0; j < root.workspaces.length; j++) {
+      var ws = root.workspaces[j]
+      var copy = {
+        id: ws.id, idx: ws.idx, output: ws.output,
+        isActive: ws.output === affectedOutput ? ws.id === activatedId : ws.isActive,
+        isFocused: data.focused ? ws.id === activatedId : ws.isFocused,
+        occupied: ws.occupied
+      }
+      if (copy.isFocused) { focusedId = copy.id; focusedOutput = copy.output }
+      next.push(copy)
+    }
+    root.workspaces = next
+    root.focusedWorkspaceId = focusedId
+    root.focusedOutputName = focusedOutput
+  }
+
+  function focusWorkspace(id) {
+    root.sendRequest({ "Action": { "FocusWorkspace": { "reference": { "Id": id } } } })
+  }
+
   function handleNiriEvent(event) {
     if (!event) return
-    // Task 2 and Task 3 add real handling here.
+    if (event.WorkspacesChanged) { root.handleWorkspacesChanged(event.WorkspacesChanged); return }
+    if (event.WorkspaceActivated) { root.handleWorkspaceActivated(event.WorkspaceActivated); return }
     root.logEvent("event", Object.keys(event)[0] || "unknown")
   }
 
