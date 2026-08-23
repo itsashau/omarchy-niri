@@ -25,9 +25,10 @@ Item {
     console.log("omarchy niri " + root.lastEventAt + " " + root.lastEvent)
   }
 
-  // niri serves one request per connection, then closes it. Both sockets
-  // need to reconnect after every close (a request/response, or a dropped
-  // event stream) as long as the service is still active.
+  // The request socket stays open across many requests; niri only closes a
+  // connection on EventStream (handing it off permanently) or on the client
+  // disconnecting. Both sockets still need to reconnect after a close,
+  // whichever socket it is, as long as the service is still active.
   Timer {
     id: requestReconnectTimer
     interval: 200
