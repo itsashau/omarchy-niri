@@ -48,11 +48,13 @@ niri_exec() {
   niri msg action spawn -- "$@" >/dev/null 2>&1
 }
 
-SOCKET="$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock"
+if [[ -z ${NIRI_SOCKET:-} ]]; then
+  SOCKET="$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock"
 
-# Open Hyprland's event stream before spawning anything, so a terminal that maps
-# quickly can't emit its openwindow event before we are listening for it.
-exec {events}< <(socat -U - "UNIX-CONNECT:$SOCKET")
+  # Open Hyprland's event stream before spawning anything, so a terminal that maps
+  # quickly can't emit its openwindow event before we are listening for it.
+  exec {events}< <(socat -U - "UNIX-CONNECT:$SOCKET")
+fi
 
 if [[ -n ${NIRI_SOCKET:-} ]]; then
   exec {niri_events}< <(printf '"EventStream"\n' | socat -U - "UNIX-CONNECT:$NIRI_SOCKET")
