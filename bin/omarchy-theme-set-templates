@@ -138,6 +138,45 @@ color_to_shell_hex() {
   fi
 }
 
+# Like color_to_shell_hex, but preserves the alpha channel when present.
+# Niri accepts #RRGGBBAA directly (unlike Hyprland's separate-alpha
+# handling elsewhere), so niri-side color output should keep it rather
+# than truncating to #RRGGBB the way color_to_shell_hex does.
+niri_color_hex() {
+  local color r g b a
+
+  color=$(resolve_gradient_color "$1")
+
+  if [[ $color =~ ^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$ ]]; then
+    printf "#%s" "${color:1}"
+  elif [[ $color =~ ^[Rr][Gg][Bb][Aa]?\(([0-9A-Fa-f]{6})([0-9A-Fa-f]{2})?\)$ ]]; then
+    printf "#%s%s" "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+  elif [[ $color =~ ^[Rr][Gg][Bb][Aa]?\(([0-9]+),([0-9]+),([0-9]+)(,[0-9.]+)?\)$ ]]; then
+    r=${BASH_REMATCH[1]}
+    g=${BASH_REMATCH[2]}
+    b=${BASH_REMATCH[3]}
+    a=${BASH_REMATCH[4]#,}
+    (( r > 255 )) && r=255
+    (( g > 255 )) && g=255
+    (( b > 255 )) && b=255
+    if [[ -n $a ]]; then
+      printf "#%02x%02x%02x%02x" "$r" "$g" "$b" "$(awk -v a="$a" 'BEGIN { v = int(a * 255 + 0.5); if (v > 255) v = 255; if (v < 0) v = 0; printf "%d", v }')"
+    else
+      printf "#%02x%02x%02x" "$r" "$g" "$b"
+    fi
+  elif [[ $color =~ ^0x[0-9A-Fa-f]{8}$ ]]; then
+    printf "#%s" "${color:2}"
+  else
+    printf "%s" "$color"
+  fi
+}
+
+niri_color_value() {
+  local spec
+  spec=$(resolve_theme_ref "$1" "${2:-}")
+  niri_color_hex "$spec"
+}
+
 hypr_gradient_value() {
   local spec color index
 
@@ -167,18 +206,20 @@ niri_gradient_value() {
   parse_gradient "$spec"
 
   if (( ${#GRADIENT_COLORS[@]} == 0 )); then
-    first=$(color_to_shell_hex "$spec")
+    first=$(niri_color_hex "$spec")
     last="$first"
   else
-    # Unlike hypr_gradient_value (which passes colors through to Hyprland's
-    # own parser, compact rgba(RRGGBBAA) included), niri's KDL color parser
-    # rejects that compact form outright ("invalid rgb format") — every
-    # color here has to go through color_to_shell_hex first.
-    first=$(color_to_shell_hex "${GRADIENT_COLORS[0]}")
-    last=$(color_to_shell_hex "${GRADIENT_COLORS[${#GRADIENT_COLORS[@]}-1]}")
+    first=$(niri_color_hex "${GRADIENT_COLORS[0]}")
+    last=$(niri_color_hex "${GRADIENT_COLORS[${#GRADIENT_COLORS[@]}-1]}")
   fi
   angle="${GRADIENT_ANGLE:-0}"
 
+  # Niri's gradient angle follows CSS linear-gradient convention (0 =
+  # bottom-to-top); Hyprland's own gradient angle convention is
+  # different (0 = left-to-right). Reusing Hyprland's angle value here
+  # is a known, accepted cosmetic difference in gradient direction, not
+  # a bug — not worth a separate angle-remapping table for a personal
+  # theme.
   printf 'from="%s" to="%s" angle=%s' "$first" "$last" "$angle"
 }
 
@@ -294,6 +335,9 @@ add_gradient_function_value() {
     niri_gradient)
       value=$(niri_gradient_value "$key" "$fallback")
       ;;
+    niri_color)
+      value=$(niri_color_value "$key" "$fallback")
+      ;;
     *)
       return
       ;;
@@ -311,7 +355,7 @@ add_gradient_function_values() {
       [[ -n ${seen[$token]:-} ]] && continue
       seen[$token]=1
       add_gradient_function_value "$token"
-    done < <(grep -hEo '\{\{[[:space:]]*(hypr_gradient|gradient_start|shell_gradient|niri_gradient)[[:space:]]+[^}]+[[:space:]]*\}\}' "$tpl" 2>/dev/null || true)
+    done < <(grep -hEo '\{\{[[:space:]]*(hypr_gradient|gradient_start|shell_gradient|niri_gradient|niri_color)[[:space:]]+[^}]+[[:space:]]*\}\}' "$tpl" 2>/dev/null || true)
   done
 }
 

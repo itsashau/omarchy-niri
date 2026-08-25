@@ -11,19 +11,32 @@
 # default/wayland-sessions/omarchy-niri.desktop) so a dev-link change
 # takes effect on next login, with no special-casing needed in
 # omarchy-dev-link/omarchy-dev-unlink themselves.
+#
+# ~/.config/niri/config.kdl itself is fully machine-generated and safe to
+# overwrite every login — it is never where personal customization goes.
+# Personal overrides belong in ~/.config/niri/overrides.kdl instead
+# (included from default/niri/config.kdl with optional=true), which this
+# script creates once if missing and never touches again.
 
-if [[ -f /etc/omarchy.conf ]]; then
-  . /etc/omarchy.conf
-fi
 : "${OMARCHY_PATH:=/usr/share/omarchy}"
 
 config_path="$OMARCHY_PATH/default/niri/config.kdl"
 # KDL string arguments need double quotes, not shell quoting — a plain
 # printf %q would produce single-quoted or backslash-escaped output on a
-# path with spaces, neither of which is valid KDL. Escape only a literal
-# double quote (vanishingly unlikely in a real path, but correct to
-# handle) and wrap in literal double quotes ourselves.
-escaped_path=${config_path//\"/\\\"}
+# path with spaces, neither of which is valid KDL. Escape backslashes
+# before quotes (order matters: escaping the quote first would
+# double-escape the backslash the quote-escape itself introduces), then
+# wrap in literal double quotes ourselves.
+escaped_path=${config_path//\\/\\\\}
+escaped_path=${escaped_path//\"/\\\"}
 
 mkdir -p "$HOME/.config/niri"
 printf 'include "%s"\n' "$escaped_path" > "$HOME/.config/niri/config.kdl"
+
+overrides="$HOME/.config/niri/overrides.kdl"
+if [[ ! -f $overrides ]]; then
+  cat > "$overrides" <<'EOF'
+// Personal Niri config overrides. This file is created once and never
+// touched by omarchy-refresh-niri again — edit it freely.
+EOF
+fi

@@ -1,6 +1,7 @@
 // Omarchy defaults for Niri. Don't edit this file directly — put
-// personal overrides in ~/.config/niri/config.kdl instead (see
-// default/niri/README, or docs/superpowers/specs/2026-08-25-omarchy-niri-config-design.md).
+// personal overrides in ~/.config/niri/overrides.kdl instead (created
+// once by omarchy-refresh-niri if missing, never touched again — see
+// docs/superpowers/specs/2026-08-25-omarchy-niri-config-design.md).
 
 input {
     keyboard {
@@ -55,6 +56,8 @@ hotkey-overlay {
 // does — same pattern as Hyprland's
 // require_optional.module("omarchy.current.theme.hyprland").
 include "~/.local/state/omarchy/current/theme/niri.kdl" optional=true
+
+include "~/.config/niri/overrides.kdl" optional=true
 
 include "bindings.kdl"
 include "window-rules.kdl"
