@@ -300,12 +300,24 @@ Panel {
     if (!name) return
     if (enabled && root.enabledDisplayCount <= 1) return
 
-    actionProc.command = ["hyprctl", "keyword", "monitor", name + (enabled ? ",disable" : ",preferred,auto,auto")]
+    if (Compositor.isNiri) {
+      actionProc.command = ["niri", "msg", "output", name, enabled ? "off" : "on"]
+    } else {
+      actionProc.command = ["hyprctl", "keyword", "monitor", name + (enabled ? ",disable" : ",preferred,auto,auto")]
+    }
     if (!actionProc.running) actionProc.running = true
   }
 
   function setScale(scale) {
-    actionProc.command = ["bash", "-c", "omarchy-hyprland-monitor-scaling " + scale]
+    if (Compositor.isNiri) {
+      // Runtime-only under Niri: there's no config-persistence mechanism
+      // for it yet (see this plan's Global Constraints), unlike Hyprland's
+      // monitors.lua write-back. Revisit once Niri config generation
+      // exists.
+      actionProc.command = ["niri", "msg", "output", root.focusedMonitor, "scale", String(scale)]
+    } else {
+      actionProc.command = ["bash", "-c", "omarchy-hyprland-monitor-scaling " + scale]
+    }
     if (!actionProc.running) actionProc.running = true
   }
 
