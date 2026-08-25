@@ -58,7 +58,8 @@ generated=$(<"$test_home/.config/niri/config.kdl")
 run_refresh OMARCHY_PATH="/fake/checkout"
 [[ $(<"$test_home/.config/niri/config.kdl") == "$generated" ]] ||
   fail "refresh-niri run twice with the same OMARCHY_PATH must not disturb config.kdl"
-[[ ! -e "$test_home/.config/niri/config.kdl".bak.* ]] ||
+bak_files=("$test_home"/.config/niri/config.kdl.bak.*)
+[[ -e ${bak_files[0]:-} ]] &&
   fail "refresh-niri run twice with the same OMARCHY_PATH must not create a .bak file"
 pass "refresh-niri run twice with an unchanged OMARCHY_PATH leaves config.kdl alone"
 
@@ -89,3 +90,16 @@ bak_file=("$test_home"/.config/niri/config.kdl.bak.*)
 grep -qF "real hand-edited niri config" "${bak_file[0]}" ||
   fail "refresh-niri .bak file must contain the pre-existing config.kdl content"
 pass "refresh-niri backs up pre-existing config.kdl content to .bak when overrides.kdl already exists"
+
+reset_home
+run_refresh OMARCHY_PATH="/fake/path/one"
+overrides_content=$(<"$test_home/.config/niri/overrides.kdl")
+run_refresh OMARCHY_PATH="/fake/path/two"
+[[ $(<"$test_home/.config/niri/config.kdl") == 'include "/fake/path/two/default/niri/config.kdl"' ]] ||
+  fail "refresh-niri regenerates config.kdl for a changed OMARCHY_PATH"
+bak_files=("$test_home"/.config/niri/config.kdl.bak.*)
+[[ -e ${bak_files[0]:-} ]] &&
+  fail "refresh-niri changing OMARCHY_PATH must not create a .bak file of its own prior output"
+[[ $(<"$test_home/.config/niri/overrides.kdl") == "$overrides_content" ]] ||
+  fail "refresh-niri changing OMARCHY_PATH must not touch overrides.kdl"
+pass "refresh-niri changing OMARCHY_PATH regenerates config.kdl in place without a .bak file"

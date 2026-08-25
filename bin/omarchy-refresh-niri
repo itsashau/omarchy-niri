@@ -37,10 +37,17 @@ generated_line="include \"$escaped_path\""
 overrides="$HOME/.config/niri/overrides.kdl"
 
 # If a config.kdl already exists with content this script wouldn't have
-# generated itself (niri's own default, a hand-edit, or a previous
-# generated line for a different OMARCHY_PATH), it's real content worth
-# preserving rather than silently overwriting.
-if [[ -f $config_target ]] && [[ "$(<"$config_target")" != "$generated_line" ]]; then
+# generated itself (niri's own default or a hand-edit), it's real content
+# worth preserving rather than silently overwriting. A previous run's own
+# generated line for a different OMARCHY_PATH (e.g. after a dev-link
+# toggle) matches the same shape and is regenerated in place with no
+# backup — it has zero recoverable value beyond what this script already
+# produces.
+existing_content=""
+[[ -f $config_target ]] && existing_content="$(<"$config_target")"
+
+if [[ -f $config_target ]] && [[ $existing_content != "$generated_line" ]] \
+   && [[ ! $existing_content =~ ^include\ \".*/default/niri/config\.kdl\"$ ]]; then
   if [[ -f $overrides ]]; then
     mv "$config_target" "$config_target.bak.$(date +%s)"
   else
