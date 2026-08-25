@@ -31,9 +31,25 @@ escaped_path=${config_path//\\/\\\\}
 escaped_path=${escaped_path//\"/\\\"}
 
 mkdir -p "$HOME/.config/niri"
-printf 'include "%s"\n' "$escaped_path" > "$HOME/.config/niri/config.kdl"
 
+config_target="$HOME/.config/niri/config.kdl"
+generated_line="include \"$escaped_path\""
 overrides="$HOME/.config/niri/overrides.kdl"
+
+# If a config.kdl already exists with content this script wouldn't have
+# generated itself (niri's own default, a hand-edit, or a previous
+# generated line for a different OMARCHY_PATH), it's real content worth
+# preserving rather than silently overwriting.
+if [[ -f $config_target ]] && [[ "$(<"$config_target")" != "$generated_line" ]]; then
+  if [[ -f $overrides ]]; then
+    mv "$config_target" "$config_target.bak.$(date +%s)"
+  else
+    mv "$config_target" "$overrides"
+  fi
+fi
+
+printf '%s\n' "$generated_line" > "$config_target"
+
 if [[ ! -f $overrides ]]; then
   cat > "$overrides" <<'EOF'
 // Personal Niri config overrides. This file is created once and never

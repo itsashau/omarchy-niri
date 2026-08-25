@@ -57,7 +57,7 @@ hotkey-overlay {
 // require_optional.module("omarchy.current.theme.hyprland").
 include "~/.local/state/omarchy/current/theme/niri.kdl" optional=true
 
-include "~/.config/niri/overrides.kdl" optional=true
-
 include "bindings.kdl"
 include "window-rules.kdl"
+
+include "~/.config/niri/overrides.kdl" optional=true

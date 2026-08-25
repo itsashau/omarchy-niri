@@ -165,7 +165,10 @@ niri_color_hex() {
       printf "#%02x%02x%02x" "$r" "$g" "$b"
     fi
   elif [[ $color =~ ^0x[0-9A-Fa-f]{8}$ ]]; then
-    printf "#%s" "${color:2}"
+    # Hyprland's 0xAARRGGBB has alpha first, not last — reorder to niri's
+    # #RRGGBBAA rather than just dropping the 0x prefix (which would
+    # rotate the channels, e.g. turn alpha into red).
+    printf "#%s%s" "${color:4:6}" "${color:2:2}"
   else
     printf "%s" "$color"
   fi
