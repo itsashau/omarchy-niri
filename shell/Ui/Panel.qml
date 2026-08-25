@@ -28,7 +28,14 @@ Item {
     close()
     Qt.callLater(function() { popoutSwitchClosing = false })
   }
-  function toggle() { opened ? close() : open() }
+  // A click while a different panel is open closes that one only — it does
+  // not also open this one. Reaching this panel's own content needs a
+  // second, separate click once nothing else is active.
+  function toggle() {
+    if (opened) { close(); return }
+    if (bar && bar.activePopout) { bar.closeActivePopout(); return }
+    open()
+  }
   function switchPanel(direction) {
     if (bar && typeof bar.switchPanelFrom === "function") return bar.switchPanelFrom(root, direction)
     return false

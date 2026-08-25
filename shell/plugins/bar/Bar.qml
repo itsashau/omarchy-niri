@@ -315,15 +315,23 @@ Item {
 
   function requestPopout(owner) {
     if (activePopout === owner) return
-    if (activePopout) {
-      if ("closeForPopoutSwitch" in activePopout) activePopout.closeForPopoutSwitch()
-      else if ("close" in activePopout) activePopout.close()
-    }
+    closeActivePopout()
     activePopout = owner
   }
 
   function releasePopout(owner) {
     if (activePopout === owner) activePopout = null
+  }
+
+  // Closes whichever popout is currently active, if any. Shared by
+  // requestPopout (a panel opening switches the old one out) and by
+  // Panel.qml's toggle() (clicking a different bar icon closes whatever's
+  // open without also opening the one just clicked — that needs a second,
+  // separate click).
+  function closeActivePopout() {
+    if (!activePopout) return
+    if ("closeForPopoutSwitch" in activePopout) activePopout.closeForPopoutSwitch()
+    else if ("close" in activePopout) activePopout.close()
   }
 
   readonly property bool vertical: position === "left" || position === "right"

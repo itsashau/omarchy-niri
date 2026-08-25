@@ -52,8 +52,9 @@ Panel {
   }
 
   function toggle() {
-    if (root.opened) root.close()
-    else root.openFromHotkey()
+    if (root.opened) { root.close(); return }
+    if (root.bar && root.bar.activePopout) { root.bar.closeActivePopout(); return }
+    root.openFromHotkey()
   }
 
   function switchPanel(direction) {
