@@ -115,3 +115,100 @@ monitor_state "$clamshell"
 [[ ${state_lines[7]-} == '[{"name":"eDP-1","enabled":false,"focused":false,"width":0,"height":0},{"name":"DP-1","enabled":true,"focused":true,"width":2560,"height":1440}]' ]] ||
   fail "monitor state lists every display for the panel" "actual: ${state_lines[7]-<missing>}"
 pass "monitor state lists every display with its enabled and focused state"
+
+niri_test_bin=$(mktemp -d)
+niri_monitors_file=$(mktemp)
+
+niri_cleanup() {
+  rm -rf "$niri_test_bin"
+  rm -f "$niri_monitors_file"
+}
+trap niri_cleanup EXIT
+
+cat >"$niri_test_bin/niri" <<'EOF'
+#!/bin/bash
+if [[ $1 == "msg" && $2 == "-j" && $3 == "outputs" ]]; then
+  cat "$FAKE_NIRI_OUTPUTS"
+elif [[ $1 == "msg" && $2 == "-j" && $3 == "focused-output" ]]; then
+  cat "$FAKE_NIRI_FOCUSED"
+fi
+EOF
+
+cat >"$niri_test_bin/omarchy-brightness-display" <<'EOF'
+#!/bin/bash
+echo 42
+EOF
+
+chmod +x "$niri_test_bin"/*
+
+niri_state_lines=()
+niri_monitor_state() {
+  local outputs="$1" focused="$2"
+
+  mapfile -t niri_state_lines < <(
+    FAKE_NIRI_OUTPUTS=<(printf '%s' "$outputs") \
+      FAKE_NIRI_FOCUSED=<(printf '%s' "$focused") \
+      NIRI_SOCKET=/tmp/fake-niri.sock \
+      PATH="$niri_test_bin:$PATH" \
+      bash "$ROOT/bin/omarchy-monitor-state" 2>/dev/null
+  )
+}
+
+niri_assert_line() {
+  local index="$1" expected="$2" description="$3"
+
+  [[ ${niri_state_lines[index]-} == "$expected" ]] ||
+    fail "$description" "line $index expected: $expected"$'\n'"line $index actual:   ${niri_state_lines[index]-<missing>}"
+}
+
+niri_assert_line_count() {
+  local description="$1"
+
+  (( ${#niri_state_lines[@]} == 8 )) ||
+    fail "$description" "expected 8 lines, got ${#niri_state_lines[@]}"
+}
+
+niri_extended='{
+  "eDP-1": { "name": "eDP-1", "current_mode": 0, "modes": [{"width": 1920, "height": 1080, "refresh_rate": 60000, "is_preferred": true}], "logical": {"x": 0, "y": 0, "width": 1920, "height": 1080, "scale": 1.0, "transform": "Normal"} },
+  "DP-1": { "name": "DP-1", "current_mode": 0, "modes": [{"width": 2560, "height": 1440, "refresh_rate": 60000, "is_preferred": true}], "logical": {"x": 1920, "y": 0, "width": 2560, "height": 1440, "scale": 1.5, "transform": "Normal"} }
+}'
+niri_extended_focused='{ "name": "DP-1", "current_mode": 0, "modes": [{"width": 2560, "height": 1440, "refresh_rate": 60000, "is_preferred": true}], "logical": {"x": 1920, "y": 0, "width": 2560, "height": 1440, "scale": 1.5, "transform": "Normal"} }'
+
+niri_monitor_state "$niri_extended" "$niri_extended_focused"
+niri_assert_line_count "niri monitor state answers every line while extended"
+niri_assert_line 0 42 "niri monitor state reports brightness"
+niri_assert_line 1 eDP-1 "niri monitor state names the internal monitor"
+niri_assert_line 2 DP-1 "niri monitor state names the external monitor"
+niri_assert_line 3 eDP-1 "niri monitor state reports the internal monitor enabled"
+niri_assert_line 4 "" "niri monitor state always reports no mirror"
+niri_assert_line 5 DP-1 "niri monitor state reports the focused monitor"
+niri_assert_line 6 1.5 "niri monitor state reports the scale"
+pass "niri monitor state keeps its lines aligned when extended"
+
+niri_clamshell='{
+  "eDP-1": { "name": "eDP-1", "current_mode": null, "modes": [{"width": 1920, "height": 1080, "refresh_rate": 60000, "is_preferred": true}], "logical": null },
+  "DP-1": { "name": "DP-1", "current_mode": 0, "modes": [{"width": 2560, "height": 1440, "refresh_rate": 60000, "is_preferred": true}], "logical": {"x": 0, "y": 0, "width": 2560, "height": 1440, "scale": 1.0, "transform": "Normal"} }
+}'
+niri_clamshell_focused='{ "name": "DP-1", "current_mode": 0, "modes": [{"width": 2560, "height": 1440, "refresh_rate": 60000, "is_preferred": true}], "logical": {"x": 0, "y": 0, "width": 2560, "height": 1440, "scale": 1.0, "transform": "Normal"} }'
+
+niri_monitor_state "$niri_clamshell" "$niri_clamshell_focused"
+niri_assert_line_count "niri monitor state answers every line while clamshelled"
+niri_assert_line 1 eDP-1 "niri monitor state still names a disabled internal monitor"
+niri_assert_line 3 "" "niri monitor state reports the internal monitor disabled"
+niri_assert_line 4 "" "niri monitor state always reports no mirror while clamshelled"
+pass "niri monitor state separates a disabled internal monitor from a missing one"
+
+niri_monitor_state "$niri_extended" "$niri_extended_focused"
+[[ ${niri_state_lines[7]-} == '[{"name":"eDP-1","enabled":true,"focused":false,"width":1920,"height":1080},{"name":"DP-1","enabled":true,"focused":true,"width":2560,"height":1440}]' ]] ||
+  fail "niri monitor state lists every display for the panel" "actual: ${niri_state_lines[7]-<missing>}"
+niri_monitor_state "$niri_clamshell" "$niri_clamshell_focused"
+[[ ${niri_state_lines[7]-} == '[{"name":"eDP-1","enabled":false,"focused":false,"width":0,"height":0},{"name":"DP-1","enabled":true,"focused":true,"width":2560,"height":1440}]' ]] ||
+  fail "niri monitor state lists every display for the panel" "actual: ${niri_state_lines[7]-<missing>}"
+pass "niri monitor state lists every display with its enabled and focused state"
+
+niri_no_focus='{ "eDP-1": { "name": "eDP-1", "current_mode": null, "modes": [], "logical": null } }'
+niri_monitor_state "$niri_no_focus" "null"
+niri_assert_line_count "niri monitor state answers every line with no focused output"
+niri_assert_line 5 "" "niri monitor state reports no focused monitor when none exists"
+niri_assert_line 6 "" "niri monitor state reports no scale when nothing is focused"
+pass "niri monitor state degrades cleanly when no output is focused"

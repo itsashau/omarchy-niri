@@ -3,21 +3,64 @@
 # omarchy:summary=Print monitor panel state for the shell
 # omarchy:group=monitor
 
-monitors_json=$(hyprctl monitors all -j)
-focused_monitor=$(printf '%s\n' "$monitors_json" | jq -r '[.[] | select(.focused == true)][0].name // ""')
+hyprland_state() {
+  monitors_json=$(hyprctl monitors all -j)
+  focused_monitor=$(printf '%s\n' "$monitors_json" | jq -r '[.[] | select(.focused == true)][0].name // ""')
 
-{ omarchy-brightness-display --monitor "$focused_monitor" 2>/dev/null; echo; } | head -n 1
+  { omarchy-brightness-display --monitor "$focused_monitor" 2>/dev/null; echo; } | head -n 1
 
-printf '%s\n' "$monitors_json" | jq -r '
-  def internal: test("^(eDP|LVDS|DSI)-");
-  ([.[] | select(.name | internal)][0].name // ""),
-  ([.[] | select((.name | internal) | not)][0].name // ""),
-  ([.[] | select((.name | internal) and .disabled != true)][0].name // ""),
-  ([.[] | select(.mirrorOf != "none") | if (.name | internal) then .mirrorOf else .name end][0] // "")
-'
+  printf '%s\n' "$monitors_json" | jq -r '
+    def internal: test("^(eDP|LVDS|DSI)-");
+    ([.[] | select(.name | internal)][0].name // ""),
+    ([.[] | select((.name | internal) | not)][0].name // ""),
+    ([.[] | select((.name | internal) and .disabled != true)][0].name // ""),
+    ([.[] | select(.mirrorOf != "none") | if (.name | internal) then .mirrorOf else .name end][0] // "")
+  '
 
-printf '%s\n' "$focused_monitor"
-omarchy-hyprland-monitor-scaling 2>/dev/null || echo
+  printf '%s\n' "$focused_monitor"
+  omarchy-hyprland-monitor-scaling 2>/dev/null || echo
 
-printf '%s\n' "$monitors_json" | jq -c \
-  '[.[] | {name, enabled:(.disabled != true), focused:(.focused == true), width, height}]'
+  printf '%s\n' "$monitors_json" | jq -c \
+    '[.[] | {name, enabled:(.disabled != true), focused:(.focused == true), width, height}]'
+}
+
+niri_state() {
+  outputs_json=$(niri msg -j outputs)
+  focused_json=$(niri msg -j focused-output)
+  focused_monitor=$(printf '%s' "$focused_json" | jq -r '.name // ""')
+
+  { omarchy-brightness-display --monitor "$focused_monitor" 2>/dev/null; echo; } | head -n 1
+
+  # Niri's IPC has no mirror-output concept at all (confirmed against its
+  # own Output struct) — the fourth line here is always empty, by design,
+  # not a gap in this port.
+  printf '%s\n' "$outputs_json" | jq -r '
+    def internal: test("^(eDP|LVDS|DSI)-");
+    def enabled: .current_mode != null;
+    ([.[] | select(.name | internal)][0].name // ""),
+    ([.[] | select((.name | internal) | not)][0].name // ""),
+    ([.[] | select((.name | internal) and enabled)][0].name // ""),
+    ""
+  '
+
+  printf '%s\n' "$focused_monitor"
+  printf '%s' "$focused_json" | jq -r 'if . == null then "" else (.logical.scale // "") end'
+
+  printf '%s' "$outputs_json" | jq -c --arg focused "$focused_monitor" '
+    [to_entries[] | .value as $o |
+      {
+        name: $o.name,
+        enabled: ($o.current_mode != null),
+        focused: ($o.name == $focused),
+        width: (if $o.current_mode != null then $o.modes[$o.current_mode].width else 0 end),
+        height: (if $o.current_mode != null then $o.modes[$o.current_mode].height else 0 end)
+      }
+    ]
+  '
+}
+
+if [[ -n ${NIRI_SOCKET:-} ]]; then
+  niri_state
+else
+  hyprland_state
+fi
