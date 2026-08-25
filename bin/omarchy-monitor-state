@@ -25,7 +25,7 @@ hyprland_state() {
 }
 
 niri_state() {
-  outputs_json=$(niri msg -j outputs)
+  outputs_json=$(niri msg -j outputs | jq -c 'to_entries | sort_by(.key) | from_entries')
   focused_json=$(niri msg -j focused-output)
   focused_monitor=$(printf '%s' "$focused_json" | jq -r '.name // ""')
 

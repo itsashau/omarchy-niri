@@ -43,6 +43,7 @@ Panel {
   // signal so keyboard cursor and pointer share one highlight.
   readonly property var scalePresets: ["1", "1.25", "1.6", "2", "3", "4"]
   readonly property var scaleValues: {
+    if (Compositor.isNiri) return scalePresets
     for (var i = 0; i < displays.length; i++) {
       var display = displays[i]
       if (display && display.focused)
@@ -266,6 +267,13 @@ Panel {
   }
 
   function activeScaleIndex() {
+    if (Compositor.isNiri) {
+      var normalizedCurrent = root.normalizeScale(monitorScale)
+      for (var j = 0; j < scaleValues.length; j++) {
+        if (root.normalizeScale(scaleValues[j]) === normalizedCurrent) return j
+      }
+      return -1
+    }
     for (var i = 0; i < displays.length; i++) {
       var display = displays[i]
       if (display && display.focused)
@@ -275,6 +283,7 @@ Panel {
   }
 
   function effectiveScale(scale) {
+    if (Compositor.isNiri) return root.normalizeScale(scale)
     for (var i = 0; i < displays.length; i++) {
       var display = displays[i]
       if (display && display.focused)
@@ -310,10 +319,11 @@ Panel {
 
   function setScale(scale) {
     if (Compositor.isNiri) {
+      if (!root.focusedMonitor) return
       // Runtime-only under Niri: there's no config-persistence mechanism
-      // for it yet (see this plan's Global Constraints), unlike Hyprland's
-      // monitors.lua write-back. Revisit once Niri config generation
-      // exists.
+      // for it yet (see docs/superpowers/plans/2026-08-25-omarchy-niri-monitor.md's
+      // Global Constraints), unlike Hyprland's monitors.lua write-back.
+      // Revisit once Niri config generation exists.
       actionProc.command = ["niri", "msg", "output", root.focusedMonitor, "scale", String(scale)]
     } else {
       actionProc.command = ["bash", "-c", "omarchy-hyprland-monitor-scaling " + scale]

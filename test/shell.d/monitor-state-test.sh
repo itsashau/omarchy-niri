@@ -117,11 +117,10 @@ monitor_state "$clamshell"
 pass "monitor state lists every display with its enabled and focused state"
 
 niri_test_bin=$(mktemp -d)
-niri_monitors_file=$(mktemp)
 
 niri_cleanup() {
+  cleanup
   rm -rf "$niri_test_bin"
-  rm -f "$niri_monitors_file"
 }
 trap niri_cleanup EXIT
 
@@ -170,9 +169,9 @@ niri_assert_line_count() {
 
 niri_extended='{
   "eDP-1": { "name": "eDP-1", "current_mode": 0, "modes": [{"width": 1920, "height": 1080, "refresh_rate": 60000, "is_preferred": true}], "logical": {"x": 0, "y": 0, "width": 1920, "height": 1080, "scale": 1.0, "transform": "Normal"} },
-  "DP-1": { "name": "DP-1", "current_mode": 0, "modes": [{"width": 2560, "height": 1440, "refresh_rate": 60000, "is_preferred": true}], "logical": {"x": 1920, "y": 0, "width": 2560, "height": 1440, "scale": 1.5, "transform": "Normal"} }
+  "DP-1": { "name": "DP-1", "current_mode": 1, "modes": [{"width": 1920, "height": 1080, "refresh_rate": 60000, "is_preferred": false}, {"width": 2560, "height": 1440, "refresh_rate": 60000, "is_preferred": true}], "logical": {"x": 1920, "y": 0, "width": 2560, "height": 1440, "scale": 1.5, "transform": "Normal"} }
 }'
-niri_extended_focused='{ "name": "DP-1", "current_mode": 0, "modes": [{"width": 2560, "height": 1440, "refresh_rate": 60000, "is_preferred": true}], "logical": {"x": 1920, "y": 0, "width": 2560, "height": 1440, "scale": 1.5, "transform": "Normal"} }'
+niri_extended_focused='{ "name": "DP-1", "current_mode": 1, "modes": [{"width": 1920, "height": 1080, "refresh_rate": 60000, "is_preferred": false}, {"width": 2560, "height": 1440, "refresh_rate": 60000, "is_preferred": true}], "logical": {"x": 1920, "y": 0, "width": 2560, "height": 1440, "scale": 1.5, "transform": "Normal"} }'
 
 niri_monitor_state "$niri_extended" "$niri_extended_focused"
 niri_assert_line_count "niri monitor state answers every line while extended"
@@ -199,10 +198,10 @@ niri_assert_line 4 "" "niri monitor state always reports no mirror while clamshe
 pass "niri monitor state separates a disabled internal monitor from a missing one"
 
 niri_monitor_state "$niri_extended" "$niri_extended_focused"
-[[ ${niri_state_lines[7]-} == '[{"name":"eDP-1","enabled":true,"focused":false,"width":1920,"height":1080},{"name":"DP-1","enabled":true,"focused":true,"width":2560,"height":1440}]' ]] ||
+[[ ${niri_state_lines[7]-} == '[{"name":"DP-1","enabled":true,"focused":true,"width":2560,"height":1440},{"name":"eDP-1","enabled":true,"focused":false,"width":1920,"height":1080}]' ]] ||
   fail "niri monitor state lists every display for the panel" "actual: ${niri_state_lines[7]-<missing>}"
 niri_monitor_state "$niri_clamshell" "$niri_clamshell_focused"
-[[ ${niri_state_lines[7]-} == '[{"name":"eDP-1","enabled":false,"focused":false,"width":0,"height":0},{"name":"DP-1","enabled":true,"focused":true,"width":2560,"height":1440}]' ]] ||
+[[ ${niri_state_lines[7]-} == '[{"name":"DP-1","enabled":true,"focused":true,"width":2560,"height":1440},{"name":"eDP-1","enabled":false,"focused":false,"width":0,"height":0}]' ]] ||
   fail "niri monitor state lists every display for the panel" "actual: ${niri_state_lines[7]-<missing>}"
 pass "niri monitor state lists every display with its enabled and focused state"
 
