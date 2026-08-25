@@ -1,0 +1,60 @@
+// Omarchy defaults for Niri. Don't edit this file directly — put
+// personal overrides in ~/.config/niri/config.kdl instead (see
+// default/niri/README, or docs/superpowers/specs/2026-08-25-omarchy-niri-config-design.md).
+
+input {
+    keyboard {
+        xkb {
+            // Left empty deliberately: niri fetches xkb settings from
+            // org.freedesktop.locale1 automatically when this block is
+            // empty. Only add explicit layout/variant/options here if
+            // live testing shows that doesn't pick up the right layout.
+        }
+
+        numlock
+        repeat-rate 40
+        repeat-delay 250
+    }
+
+    touchpad {
+        tap
+        click-method "clickfinger"
+        scroll-factor 0.4
+    }
+}
+
+layout {
+    gaps 8
+
+    focus-ring {
+        off
+    }
+
+    border {
+        width 2
+        active-color "#33ccff"
+        inactive-color "#595959aa"
+    }
+
+    shadow {
+        // Matches the current theme's shadow.enabled = false.
+    }
+}
+
+cursor {
+    hide-when-typing
+}
+
+hotkey-overlay {
+    skip-at-startup
+}
+
+// Theme colors override the border section above. optional=true means
+// this silently no-ops before the theme system has ever run (e.g. right
+// after a fresh omarchy dev link), then picks up colors the moment it
+// does — same pattern as Hyprland's
+// require_optional.module("omarchy.current.theme.hyprland").
+include "~/.local/state/omarchy/current/theme/niri.kdl" optional=true
+
+include "bindings.kdl"
+include "window-rules.kdl"

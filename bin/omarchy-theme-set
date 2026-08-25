@@ -190,6 +190,7 @@ flock -u 9
 post_theme_commands=(
   omarchy-restart-terminal
   omarchy-restart-hyprctl
+  omarchy-restart-niri
   omarchy-restart-btop
   omarchy-restart-opencode
   omarchy-restart-helix

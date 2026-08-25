@@ -160,6 +160,28 @@ hypr_gradient_value() {
   fi
 }
 
+niri_gradient_value() {
+  local spec first last angle
+
+  spec=$(resolve_theme_ref "$1" "${2:-}")
+  parse_gradient "$spec"
+
+  if (( ${#GRADIENT_COLORS[@]} == 0 )); then
+    first=$(color_to_shell_hex "$spec")
+    last="$first"
+  else
+    # Unlike hypr_gradient_value (which passes colors through to Hyprland's
+    # own parser, compact rgba(RRGGBBAA) included), niri's KDL color parser
+    # rejects that compact form outright ("invalid rgb format") — every
+    # color here has to go through color_to_shell_hex first.
+    first=$(color_to_shell_hex "${GRADIENT_COLORS[0]}")
+    last=$(color_to_shell_hex "${GRADIENT_COLORS[${#GRADIENT_COLORS[@]}-1]}")
+  fi
+  angle="${GRADIENT_ANGLE:-0}"
+
+  printf 'from="%s" to="%s" angle=%s' "$first" "$last" "$angle"
+}
+
 gradient_start_value() {
   local spec
 
@@ -269,6 +291,9 @@ add_gradient_function_value() {
     shell_gradient)
       value=$(shell_gradient_value "$key" "$fallback")
       ;;
+    niri_gradient)
+      value=$(niri_gradient_value "$key" "$fallback")
+      ;;
     *)
       return
       ;;
@@ -286,7 +311,7 @@ add_gradient_function_values() {
       [[ -n ${seen[$token]:-} ]] && continue
       seen[$token]=1
       add_gradient_function_value "$token"
-    done < <(grep -hEo '\{\{[[:space:]]*(hypr_gradient|gradient_start|shell_gradient)[[:space:]]+[^}]+[[:space:]]*\}\}' "$tpl" 2>/dev/null || true)
+    done < <(grep -hEo '\{\{[[:space:]]*(hypr_gradient|gradient_start|shell_gradient|niri_gradient)[[:space:]]+[^}]+[[:space:]]*\}\}' "$tpl" 2>/dev/null || true)
   done
 }
 

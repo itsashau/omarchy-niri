@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# omarchy:summary=Regenerate the entry point ~/.config/niri/config.kdl points OMARCHY_PATH at
+# omarchy:hidden=true
+
+# Niri's `include` has no environment-variable expansion (unlike
+# Hyprland's Lua config, which reads $OMARCHY_PATH live via os.getenv on
+# every reload) — so unlike Hyprland's static ~/.config/hypr/hyprland.lua,
+# this file has to be regenerated whenever OMARCHY_PATH changes, not just
+# copied once. Run at the start of every Niri session (see
+# default/wayland-sessions/omarchy-niri.desktop) so a dev-link change
+# takes effect on next login, with no special-casing needed in
+# omarchy-dev-link/omarchy-dev-unlink themselves.
+
+if [[ -f /etc/omarchy.conf ]]; then
+  . /etc/omarchy.conf
+fi
+: "${OMARCHY_PATH:=/usr/share/omarchy}"
+
+config_path="$OMARCHY_PATH/default/niri/config.kdl"
+# KDL string arguments need double quotes, not shell quoting — a plain
+# printf %q would produce single-quoted or backslash-escaped output on a
+# path with spaces, neither of which is valid KDL. Escape only a literal
+# double quote (vanishingly unlikely in a real path, but correct to
+# handle) and wrap in literal double quotes ourselves.
+escaped_path=${config_path//\"/\\\"}
+
+mkdir -p "$HOME/.config/niri"
+printf 'include "%s"\n' "$escaped_path" > "$HOME/.config/niri/config.kdl"
