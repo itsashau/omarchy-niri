@@ -75,6 +75,15 @@ PanelWindow {
     if (open && backingWindowVisible) focusPrimeTimer.restart()
   }
 
+  // Niri grants OnDemand focus to a newly-mapped surface directly, so it
+  // never needs the Exclusive prime below — that workaround is specific to
+  // Hyprland's OnDemand mode only focusing on click/hover, not on map.
+  function keyboardFocusMode() {
+    if (Compositor.isNiri) return open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    if (!open) return WlrKeyboardFocus.None
+    return focusPrimed ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.Exclusive
+  }
+
   // --- screen + lifetime ---------------------------------------------------
 
   screen: anchorWindow ? anchorWindow.screen : null
@@ -89,15 +98,14 @@ PanelWindow {
   // animate, but keyboard/click ownership must release the moment the
   // logical close fires — otherwise the user is locked out for 140ms.
   //
-  // Prime with Exclusive on every open, then settle on OnDemand. Hyprland
-  // focuses OnDemand when a surface first maps, but not when an already-mapped
-  // fade-out surface changes from None back to OnDemand. Exclusive also takes
-  // focus when the previously focused application has constrained the pointer.
-  // The brief prime covers both cases; OnDemand then releases compositor-wide
-  // pointer hit-testing so clicks can reach the dismissal windows below.
-  WlrLayershell.keyboardFocus: open
-    ? (focusPrimed ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.Exclusive)
-    : WlrKeyboardFocus.None
+  // Prime with Exclusive on every open, then settle on OnDemand (Hyprland
+  // only — see keyboardFocusMode above). Hyprland focuses OnDemand when a
+  // surface first maps, but not when an already-mapped fade-out surface
+  // changes from None back to OnDemand. Exclusive also takes focus when the
+  // previously focused application has constrained the pointer. The brief
+  // prime covers both cases; OnDemand then releases compositor-wide pointer
+  // hit-testing so clicks can reach the dismissal windows below.
+  WlrLayershell.keyboardFocus: keyboardFocusMode()
 
   onBackingWindowVisibleChanged: beginFocusPrime()
 
