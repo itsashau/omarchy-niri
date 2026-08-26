@@ -3,6 +3,12 @@
 // once by omarchy-refresh-niri if missing, never touched again — see
 // docs/superpowers/specs/2026-08-25-omarchy-niri-config-design.md).
 
+// key_press_enables_dpms / mouse_move_enables_dpms (Hyprland's DPMS-
+// wake-on-input settings) are not configured here. This project's idle
+// handling already uses the standard ext-idle-notify-v1 protocol under
+// Niri (confirmed working), which may already cover this with no
+// explicit config needed. Verify live in the VM (see this plan's
+// closing Verification section) before adding explicit config here.
 input {
     keyboard {
         xkb {
