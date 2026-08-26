@@ -1,3 +1,372 @@
-// Omarchy window rules for Niri, translated from default/hypr/windows.lua
-// and default/hypr/apps/*.lua. Populated by a later task in this plan; see
-// docs/superpowers/plans/2026-08-25-omarchy-niri-config.md.
+// Omarchy window rules for Niri, translated from default/hypr/windows.lua,
+// default/hypr/apps/*.lua, and the terminal-specific tail of
+// default/hypr/input.lua. See
+// docs/superpowers/specs/2026-08-25-omarchy-niri-config-design.md and
+// .superpowers/sdd/2026-08-25-omarchy-niri-config/task-7-report.md.
+//
+// Translation strategy note: Hyprland's o.window() wrapper lets rules tag a
+// window (tag = "+foo" / "-foo") and later rules match on `{ tag = "foo" }`.
+// Niri's WindowRule has no such arbitrary-tag concept at all (its `match`
+// block only supports app-id/title regexes plus is-active/is-focused/
+// is-floating/is-window-cast-target/is-urgent/at-startup booleans — confirmed
+// against niri-config/src/window_rule.rs's `Match` struct). Every tag chain
+// below (default-opacity, floating-window, chromium-based-browser,
+// firefox-based-browser, pip, terminal, noidle, pop) was traced back to its
+// real consumer(s) and inlined as direct app-id/title match rules per source
+// file. Where the same tag was reused by multiple apps/files (e.g.
+// floating-window's 875x600 float size), the resulting niri rules duplicate
+// that behavior per file rather than sharing one rule, to keep the
+// one-comment-header-per-source-file organization below accurate.
+
+// ---- default/hypr/windows.lua ----
+
+// Global default opacity. Hyprland's opacity = "0.985 0.96" is an
+// active/inactive pair; niri's WindowRule has a single `opacity: Option<f32>`
+// field with no active/inactive distinction (confirmed in
+// niri-config/src/window_rule.rs), so this collapses to one value. Apps
+// below that opted out of Hyprland's default-opacity tag get their own
+// `opacity 1.0` rule instead (see each file's section).
+window-rule {
+    opacity 0.985
+}
+
+// The following two Hyprland window rules are NOT translated:
+//   - suppress_event = "maximize" (applied to all windows)
+//   - the XWayland empty-class/title/float/non-fullscreen/unpinned
+//     no_focus rule (an XWayland drag-fix workaround)
+// Both look Hyprland-internals-specific, and Niri uses a structurally
+// different XWayland integration (a separate xwayland-satellite
+// process) — the underlying bug the drag-fix works around may not even
+// reproduce here. Verify live whether Niri has the same XWayland drag
+// issue before deciding whether either of these needs a real niri
+// translation. See
+// docs/superpowers/specs/2026-08-25-omarchy-niri-config-design.md.
+// Additionally confirmed: niri's Match struct has no "is this an XWayland
+// surface" predicate at all (only app-id/title regexes and the boolean
+// is-active/is-focused/is-active-in-column/is-floating/
+// is-window-cast-target/is-urgent/at-startup fields), so even if the same
+// drag bug reproduces, the specific empty-class/title XWayland rule as
+// written could not be expressed as a niri window-rule match regardless.
+
+// ---- default/hypr/apps/1password.lua ----
+// no_screen_share -> block-out-from "screen-capture" (confirmed BlockOutFrom
+// enum values "screencast"/"screen-capture" in appearance.rs; screen-capture
+// is the broader option, also hiding from third-party screenshot tools, per
+// niri's own Window-Rules doc). tag = "+floating-window" is inlined as its
+// system.lua consequence: open-floating true plus the 875x600 float size.
+window-rule {
+    match app-id=r#"^(1[p|P]assword)$"#
+    block-out-from "screen-capture"
+    open-floating true
+    default-column-width { fixed 875; }
+    default-window-height { fixed 600; }
+}
+
+// ---- default/hypr/apps/battlenet.lua ----
+window-rule {
+    match app-id=r#"^steam_app_battlenet$"# title=r#"^Battle\.net$"#
+    open-floating true
+    default-column-width { fixed 1280; }
+    default-window-height { fixed 800; }
+    // center = true needs no rule: niri centers new floating windows by
+    // default when no default-floating-position/stored position exists
+    // (confirmed in src/layout/floating.rs's add_tile, which falls back to
+    // center_preferring_top_left_in_area).
+}
+window-rule {
+    match app-id=r#"^steam_app_battlenet$"# title=r#"^Battle\.net Setup$"#
+    // decorate = false -> border { off; }
+    border { off; }
+    // no_shadow = true -> shadow { off; }
+    shadow { off; }
+    // no_blur = true -> background-effect { blur false; } (confirmed field
+    // in appearance.rs's BackgroundEffectRule and niri's Window-Rules doc;
+    // currently a no-op since config.kdl's layout has blur globally off
+    // anyway, kept for parity if that ever changes).
+    background-effect { blur false; }
+}
+
+// ---- default/hypr/apps/bitwarden.lua ----
+// Same floating-window + no_screen_share treatment as 1password.lua, plus
+// Bitwarden's own Chrome extension popup window.
+window-rule {
+    match app-id=r#"^(Bitwarden)$"#
+    match app-id="chrome-nngceckbapebfimnlniiiahkandclblb-Default"
+    block-out-from "screen-capture"
+    open-floating true
+    default-column-width { fixed 875; }
+    default-window-height { fixed 600; }
+}
+
+// ---- default/hypr/apps/browser.lua ----
+// Chromium-based browsers: forced tiled + fully opaque, except the
+// YouTube/Zoom "app mode" PWA windows, which get excluded here (their
+// WM_CLASS commonly looks like "chrome-youtube.com__...", which does match
+// the chromium app-id regex below) and handled by their own rule instead —
+// mirrors the source's tag-add-then-tag-remove ordering.
+window-rule {
+    match app-id="((google-)?[cC]hrom(e|ium)|[bB]rave-browser|[mM]icrosoft-edge|Vivaldi-stable|helium)"
+    exclude app-id=r#"(^.+-youtube\.com__.*$|^.+-app\.zoom\.us__wc_home.*$)"#
+    open-floating false
+    opacity 1.0
+}
+window-rule {
+    match app-id="([fF]irefox|zen|librewolf)"
+    opacity 1.0
+}
+window-rule {
+    match app-id=r#"(^.+-youtube\.com__.*$|^.+-app\.zoom\.us__wc_home.*$)"#
+    opacity 1.0
+}
+// Hide screen sharing notification windows: workspace = "special silent" is
+// Hyprland's floating hidden-workspace concept, which niri has no equivalent
+// for at all (already established for the scratchpad case in bindings.kdl —
+// see docs/superpowers/specs/2026-08-25-omarchy-niri-config-design.md). Not
+// ported.
+
+// ---- default/hypr/apps/davinci-resolve.lua ----
+window-rule {
+    match app-id=".*[Rr]esolve.*"
+    open-floating true
+    opacity 1.0
+    // stay_focused = true has no niri counterpart: WindowRule has no
+    // settable "keep/deny focus" property (is-focused only exists as a
+    // *match* predicate, not something a rule can set), confirmed in
+    // window_rule.rs. Not ported.
+}
+window-rule {
+    match app-id=".*[Rr]esolve.*" title="^DaVinci Resolve( Studio)? - .+$"
+    open-fullscreen true
+}
+// stay_focused = false on the main editor/Project Manager windows is
+// likewise dropped, same reasoning as above.
+
+// ---- default/hypr/apps/geforce.lua ----
+// idle_inhibit = "fullscreen" was the only property on this rule. Niri's
+// WindowRule has no idle-inhibit field at all (confirmed absent from
+// window_rule.rs); niri relies on apps requesting the idle-inhibit protocol
+// themselves. Not ported — no rule needed for this file.
+
+// ---- default/hypr/apps/jetbrains.lua ----
+// no_follow_mouse = true was the only property on this rule. Niri's
+// WindowRule has no per-window follow-mouse override (follow-mouse is an
+// input{}-wide option, not a window rule — confirmed absent from
+// window_rule.rs). Not ported — no rule needed for this file.
+
+// ---- default/hypr/apps/localsend.lua ----
+window-rule {
+    match app-id="(Share|localsend)"
+    open-floating true
+    // center = true needs no rule; see the battlenet.lua comment above.
+}
+window-rule {
+    match app-id="localsend"
+    default-column-width { fixed 1100; }
+    default-window-height { fixed 700; }
+}
+
+// ---- default/hypr/apps/moonlight.lua ----
+window-rule {
+    match app-id="com.moonlight_stream.Moonlight"
+    open-fullscreen true
+    // idle_inhibit = "fullscreen" dropped; see geforce.lua's comment.
+}
+
+// ---- default/hypr/apps/omarchy-shell.lua ----
+// Only the one o.window() call below is a window rule; the file's
+// hl.layer_rule() calls are layer-shell rules, out of scope for
+// window-rules.kdl (no layer-rules.kdl exists in this plan).
+window-rule {
+    match app-id="^org.quickshell$" title="^Omarchy shell – dev gallery$"
+    open-maximized true
+}
+
+// ---- default/hypr/apps/pip.lua ----
+window-rule {
+    match title="(Picture.?in.?[Pp]icture)"
+    open-floating true
+    opacity 1.0
+    default-column-width { fixed 600; }
+    default-window-height { fixed 338; }
+    // Anchored near the top-right corner. Hyprland positioned this
+    // dynamically (monitor_w-window_w-40, monitor_h*0.04); niri's
+    // default-floating-position only takes a fixed pixel offset, not a
+    // proportional/expression value (confirmed: FloatingPosition's x/y are
+    // plain FloatOrInt, no percentage support), so the 4%-of-height y
+    // offset is approximated here as a flat 40px, which matches 1080p-class
+    // displays closely but will drift on very different resolutions.
+    default-floating-position x=40 y=40 relative-to="top-right"
+    // pin = true (always-on-top/sticky across workspaces) has no niri
+    // window-rule counterpart at all (no sticky/pin/always-on-top field
+    // anywhere in window_rule.rs). Not ported.
+    // border_size = 0 -> border { off; }
+    border { off; }
+}
+// Google Meet PiP uses the meeting title instead of "Picture-in-Picture".
+// Its position (bottom-right, 40px margins both axes) IS a pair of fixed
+// margins, so this one translates exactly, no approximation needed.
+window-rule {
+    match app-id="((google-)?[cC]hrom(e|ium)|[bB]rave-browser|[mM]icrosoft-edge|Vivaldi-stable|helium)" title="^Meet - .+"
+    open-floating true
+    opacity 1.0
+    default-column-width { fixed 600; }
+    default-window-height { fixed 338; }
+    default-floating-position x=40 y=40 relative-to="bottom-right"
+    border { off; }
+}
+
+// ---- default/hypr/apps/qemu.lua ----
+window-rule {
+    match app-id="qemu"
+    opacity 1.0
+}
+
+// ---- default/hypr/apps/retroarch.lua ----
+window-rule {
+    match app-id="com.libretro.RetroArch"
+    open-fullscreen true
+    opacity 1.0
+    // idle_inhibit = "fullscreen" dropped; see geforce.lua's comment.
+}
+
+// ---- default/hypr/apps/screenshot-selection.lua ----
+// This file only contains an hl.layer_rule() call (the slurp selection
+// overlay), no o.window() rules. Out of scope for window-rules.kdl.
+
+// ---- default/hypr/apps/steam.lua ----
+window-rule {
+    match app-id="steam"
+    open-floating true
+    // idle_inhibit = "fullscreen" dropped; see geforce.lua's comment.
+}
+window-rule {
+    match app-id="steam" title="Steam"
+    default-column-width { fixed 1100; }
+    default-window-height { fixed 700; }
+    // center = true needs no rule; see the battlenet.lua comment above.
+}
+window-rule {
+    match app-id="steam.*"
+    opacity 1.0
+}
+window-rule {
+    match app-id="steam" title="Friends List"
+    default-column-width { fixed 460; }
+    default-window-height { fixed 800; }
+}
+
+// ---- default/hypr/apps/system.lua ----
+// The floating-window tag's consequence (open-floating true, 875x600 float
+// size, center which needs no rule) inlined for every app that tagged
+// itself +floating-window in this file: the big TUI/utility app-id list and
+// the xdg-desktop-portal-gtk file-picker portal.
+window-rule {
+    match app-id="(org.omarchy.btop|org.omarchy.terminal|org.omarchy.bash|org.codeberg.dnkl.foot|org.gnome.NautilusPreviewer|org.gnome.Evince|Omarchy|About|TUI.float|imv|mpv)"
+    match app-id="xdg-desktop-portal-gtk"
+    match app-id="(sublime_text|DesktopEditors|org.gnome.Nautilus)" title="^(Open.*Files?|Open [F|f]older.*|Save.*Files?|Save.*As|Save|All Files|.*wants to [open|save].*|[C|c]hoose.*)"
+    open-floating true
+    default-column-width { fixed 875; }
+    default-window-height { fixed 600; }
+}
+window-rule {
+    match app-id="org.omarchy.about"
+    open-floating true
+    default-column-width { fixed 920; }
+    default-window-height { fixed 480; }
+    // center = true needs no rule; see the battlenet.lua comment above.
+}
+window-rule {
+    match app-id="dev.tensaku.Tensaku"
+    open-floating true
+    // center = true needs no rule; see the battlenet.lua comment above.
+}
+window-rule {
+    match app-id="omacalc"
+    open-floating true
+}
+window-rule {
+    match app-id="org.omarchy.screensaver"
+    open-fullscreen true
+    open-floating true
+    // animation = "slide" has no niri window-rule counterpart (no per-rule
+    // open/close animation override field in window_rule.rs). Not ported.
+}
+// No transparency on media windows.
+window-rule {
+    match app-id="^(zoom|vlc|mpv|org.kde.kdenlive|com.obsproject.Studio|com.github.PintaProject.Pinta|imv|org.gnome.NautilusPreviewer)$"
+    opacity 1.0
+}
+// { tag = "pop" } rounding = 8 is dropped entirely: "pop" is not set by any
+// static rule in these 19 files — it's applied at runtime to an arbitrary
+// already-open window by bin/omarchy-hyprland-window-pop via a Hyprland
+// hyprctl dispatch (hl.dsp.window.tag). Niri's window-rule matching is
+// purely static (app-id/title/window-state predicates fixed at config-parse
+// time); there is no mechanism to apply a rule to "whichever window a
+// runtime command just tagged". geometry-corner-radius exists as a field,
+// but the dynamic-tagging mechanism this rule depends on does not port, so
+// there's nothing for a niri window-rule to attach to. Fixing
+// omarchy-hyprland-window-pop itself is out of scope here.
+// { tag = "noidle" } idle_inhibit = "always" is also dropped: idle_inhibit
+// has no niri WindowRule field at all (see geforce.lua's comment), and,
+// separately, nothing in this repo ever sets the "+noidle" tag (checked via
+// a repo-wide grep), so this rule is doubly moot.
+
+// ---- default/hypr/apps/telegram.lua ----
+// focus_on_activate = false would map to `on-xdg-activate "ignore"` —
+// niri's WindowRule does have an OnXdgActivate field (Ignore/SetUrgent/
+// Focus, confirmed in window_rule.rs) governing exactly this: whether an
+// xdg-activation request (the protocol apps like Telegram use to ask for
+// focus on a new message) is honored. But niri's own docs mark this field
+// "Since: next release" and the dev VM's installed niri 26.04 rejects it
+// (`niri validate` error: "unexpected node `on-xdg-activate`") — it isn't
+// in the release this fork targets yet. Not ported for now; revisit once
+// the running niri version includes it.
+
+// ---- default/hypr/apps/terminals.lua ----
+// tag = "+terminal" has no rendering/geometry consequence of its own: its
+// only consumer anywhere in this repo is bindings/clipboard.lua's terminal-
+// vs-GUI paste key distinction, which is itself already dropped (see
+// bindings.kdl's "Explicitly dropped" list / the design spec's clipboard
+// entry — niri's IPC has no "send this key combo to the focused surface"
+// equivalent). Not ported — no rule needed for this file.
+
+// ---- default/hypr/apps/webcam-overlay.lua ----
+// The three size/move presets (small/medium/large) are dropped: both their
+// size and position are computed as arithmetic expressions of monitor
+// height (e.g. monitor_h*4/25, monitor_w-monitor_h*4/25-40). Niri's
+// PresetSize is only Proportion(f64) (of the *same-axis* working-area
+// dimension) or Fixed(i32) pixels (confirmed in niri-config/src/layout.rs),
+// and default-floating-position's x/y are plain fixed pixel values
+// (confirmed in window_rule.rs) — neither supports a cross-axis proportion
+// or an arbitrary expression, so there is no static niri equivalent for
+// "width computed from monitor height" or "position computed from monitor
+// height minus a computed size". Not ported.
+window-rule {
+    match app-id="^WebcamOverlay-(small|medium|large)$" title="^WebcamOverlay$"
+    open-floating true
+    // no_initial_focus = true -> open-focused false
+    open-focused false
+    opacity 1.0
+    // pin = true dropped; see pip.lua's comment (no sticky/always-on-top
+    // field in window_rule.rs).
+    // no_dim = true dropped: niri has no "dim inactive windows" concept at
+    // all (no dim field anywhere in window_rule.rs or appearance.rs). Not
+    // ported.
+}
+
+// ---- default/hypr/input.lua (tail: per-terminal touchpad scroll tweaks) ----
+// niri's WindowRule has a `scroll-factor` field (confirmed in
+// window_rule.rs and niri's Window-Rules doc, "Since: 25.02"), so both
+// rules translate. Scope differs from Hyprland's scroll_touchpad, though:
+// niri's scroll-factor multiplies *all* scroll input sent to the window —
+// both touchpad and mouse wheel — not touchpad only (confirmed in
+// src/input/mod.rs, where window_scroll_factor is applied to both the
+// Wheel and Finger axis sources).
+window-rule {
+    match app-id="(Alacritty|kitty|foot)"
+    scroll-factor 1.5
+}
+window-rule {
+    match app-id="com.mitchellh.ghostty"
+    scroll-factor 0.2
+}
