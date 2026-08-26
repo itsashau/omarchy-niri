@@ -9,11 +9,6 @@
 // to port.
 switch-events {
     lid-close { spawn "omarchy-system-lid-close"; }
-    // omarchy-hyprland-monitor-clamshell drives hyprctl directly and is
-    // Hyprland-specific by name; ported as-is per this plan's mechanical
-    // translation scope (same situation as autostart's
-    // omarchy-hyprland-monitor-watch, per the design spec) -- a niri-native
-    // monitor-reconciliation script is a separate, later concern.
     lid-open { spawn "omarchy-hyprland-monitor-clamshell"; }
 }
 
@@ -21,6 +16,17 @@ switch-events {
 // window-management and remaining bindings into this same block and close
 // it when done.
 binds {
+    // This file ports each Hyprland binding to the same key combination
+    // calling the same shell command, per this plan's mechanical-translation
+    // scope (see the design spec). Some of these commands are internally
+    // Hyprland-specific (call hyprctl directly, or read Hyprland's own
+    // config/state) and will not work correctly -- or will silently no-op --
+    // under Niri. This file does not attempt to audit or flag every such
+    // case; identifying which bound commands actually need a niri-native
+    // replacement is separate, later work (see this plan's own closing
+    // Verification section, and the design spec's autostart section for the
+    // same situation with omarchy-hyprland-monitor-watch).
+
     // ---- Applications (default/hypr/bindings/applications.lua) ----
     Mod+Return hotkey-overlay-title="Terminal" { spawn "omarchy-launch-terminal"; }
     Mod+Shift+Return hotkey-overlay-title="Browser" { spawn "omarchy-launch-browser"; }
@@ -116,11 +122,6 @@ binds {
     Mod+Shift+Space hotkey-overlay-title="Toggle top bar" { spawn "omarchy-toggle-bar"; }
     Mod+Ctrl+Space hotkey-overlay-title="Background switcher" { spawn "omarchy-menu" "toggle" "background"; }
     Mod+Shift+Ctrl+Space hotkey-overlay-title="Theme menu" { spawn "omarchy-menu" "toggle" "theme"; }
-    // The three omarchy-hyprland-window-*-toggle commands below drive
-    // hyprctl directly and are Hyprland-specific by name; ported as-is per
-    // this plan's mechanical translation scope (same situation as the
-    // lid-switch monitor script above) -- a niri-native equivalent is a
-    // separate, later concern.
     Mod+BackSpace hotkey-overlay-title="Toggle window transparency" { spawn "omarchy-hyprland-window-transparency-toggle"; }
     Mod+Shift+BackSpace hotkey-overlay-title="Toggle window gaps" { spawn "omarchy-hyprland-window-gaps-toggle"; }
     Mod+Ctrl+BackSpace hotkey-overlay-title="Toggle single-window square aspect" { spawn "omarchy-hyprland-window-single-square-aspect-toggle"; }
@@ -133,9 +134,6 @@ binds {
 
     Mod+Ctrl+I hotkey-overlay-title="Toggle locking on idle" { spawn "omarchy-toggle-idle"; }
     Mod+Ctrl+N hotkey-overlay-title="Toggle nightlight" { spawn "omarchy-toggle-nightlight"; }
-    // omarchy-hyprland-monitor-internal(-mirror) below drive hyprctl
-    // directly and are Hyprland-specific by name; ported as-is, same
-    // rationale as above.
     Mod+Ctrl+Delete hotkey-overlay-title="Toggle laptop display" { spawn "omarchy-hyprland-monitor-internal" "toggle"; }
     Mod+Ctrl+Alt+Delete hotkey-overlay-title="Toggle laptop display mirroring" { spawn "omarchy-hyprland-monitor-internal-mirror" "toggle"; }
     // Lid switch binds (switch:on:"Lid Switch" / switch:off:"Lid Switch")
