@@ -9,13 +9,52 @@
 // Niri (confirmed working), which may already cover this with no
 // explicit config needed. Verify live in the VM (see this plan's
 // closing Verification section) before adding explicit config here.
+// follow_mouse = 1 and sensitivity = 0 in input.lua are Hyprland's own
+// default values, not real customizations, so there's nothing to port
+// for either — niri's defaults already match this behavior.
 input {
     keyboard {
         xkb {
-            // Left empty deliberately: niri fetches xkb settings from
-            // org.freedesktop.locale1 automatically when this block is
-            // empty. Only add explicit layout/variant/options here if
+            // Layout/variant/model/rules are left unset deliberately:
+            // niri fetches those from org.freedesktop.locale1
+            // automatically when unset. Only add them explicitly if
             // live testing shows that doesn't pick up the right layout.
+
+            // options is set explicitly (unlike layout/variant above)
+            // because it's a hardcoded Omarchy customization in
+            // input.lua's kb_options, not something derived from system
+            // locale: CapsLock becomes the compose key, with a
+            // Shift+Shift safety-cancel (both_capslock_cancel) that
+            // clears an accidental Caps Lock misfire.
+            options "compose:caps,shift:both_capslock_cancel"
+
+            // Open question — non-Latin keyboard layouts: input.lua
+            // additionally prepends "us," to kb_layout and appends
+            // ",grp:alts_toggle" to kb_options when the detected layout
+            // isn't Latin-scripted (see its non_latin_layouts list),
+            // because "Hyprland resolves keybindings against the first
+            // entry in kb_layout, not the layout that's currently
+            // active." niri's own resolution isn't identical — per
+            // niri's docs it searches *all* configured XKB layouts for
+            // the first one containing the needed Latin key, rather
+            // than requiring a Latin layout to be listed first — but
+            // the failure mode is the same when no Latin layout is
+            // configured at all: a user whose only layout is non-Latin
+            // (which is what the automatic locale1 pickup above would
+            // give them) would still find Mod+<letter> binds like
+            // Mod+Q unresolvable, same as Hyprland without its
+            // workaround.
+            //
+            // Porting the fix isn't a plain copy: input.lua computes
+            // this per-launch in a live Lua script that reads
+            // /etc/vconsole.conf, while this config.kdl is a static
+            // file shipped as-is — niri has no per-launch KDL
+            // generation step analogous to that (bin/omarchy-refresh-
+            // niri only regenerates the include pointer, not layout
+            // content). Doing this properly needs a generation
+            // mechanism this project doesn't have yet, which is out of
+            // scope here. Left unimplemented pending that decision;
+            // verify live with a non-Latin layout in the VM first.
         }
 
         numlock
