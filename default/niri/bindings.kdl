@@ -209,3 +209,175 @@ binds {
     // repeat/cooldown-ms/allow-when-locked/allow-inhibiting properties --
     // there is no key-release trigger concept at all. Not ported; the
     // Mod+Ctrl+X toggle above is the only way to stop dictation under niri.
+
+    // ---- Window management (default/hypr/bindings/tiling.lua) ----
+    // Niri's scrollable-tiling model is structurally different from
+    // Hyprland's dwindle/master layout, so this section follows niri's own
+    // idioms (and niri's own default-config.kdl key layout, fetched from
+    // this project's dev VM) rather than forcing a literal key-for-key
+    // port. Every action name below is confirmed against
+    // `niri msg action --help` on the dev VM, not guessed.
+
+    // Directional column/window focus -- both arrows and hjkl bound to the
+    // same actions, matching niri's own default-config.kdl precedent.
+    Mod+Left  { focus-column-left; }
+    Mod+Right { focus-column-right; }
+    Mod+Up    { focus-window-up; }
+    Mod+Down  { focus-window-down; }
+    Mod+H     { focus-column-left; }
+    Mod+L     { focus-column-right; }
+    Mod+J     { focus-window-down; }
+    // Mod+K, the fourth hjkl key of this set (focus-window-up), is skipped:
+    // Mod+K is already bound above to the Keybindings menu (utilities.lua),
+    // and niri rejects a key combo bound twice. Mod+Up still reaches
+    // focus-window-up.
+
+    // Directional monitor focus, same arrows+hjkl pattern, following niri's
+    // own default-config.kdl key choice (Mod+Shift+...) since tiling.lua has
+    // no directional monitor-focus bind of its own to preserve a key from.
+    Mod+Shift+Left  { focus-monitor-left; }
+    Mod+Shift+Right { focus-monitor-right; }
+    Mod+Shift+Up    { focus-monitor-up; }
+    Mod+Shift+Down  { focus-monitor-down; }
+    Mod+Shift+H     { focus-monitor-left; }
+    Mod+Shift+L     { focus-monitor-right; }
+    Mod+Shift+J     { focus-monitor-down; }
+    Mod+Shift+K     { focus-monitor-up; }
+
+    // tiling.lua's actual monitor-focus bind ("Focus on next/previous
+    // monitor", a relative cycle, not directional) keeps its original key
+    // combo, translated to niri's own relative equivalents.
+    Ctrl+Alt+Tab       { focus-monitor-next; }
+    Ctrl+Alt+Shift+Tab { focus-monitor-previous; }
+
+    // Workspace-by-number. Niri's dynamic workspace model still accepts a
+    // plain integer index (see `focus-workspace`'s own --help), so this
+    // ports directly; tiling.lua's loop goes up to 10, so Mod+0/Shift+0
+    // cover the 10th the same way its code:19 (physical "0" key) did.
+    Mod+1 { focus-workspace 1; }
+    Mod+2 { focus-workspace 2; }
+    Mod+3 { focus-workspace 3; }
+    Mod+4 { focus-workspace 4; }
+    Mod+5 { focus-workspace 5; }
+    Mod+6 { focus-workspace 6; }
+    Mod+7 { focus-workspace 7; }
+    Mod+8 { focus-workspace 8; }
+    Mod+9 { focus-workspace 9; }
+    Mod+0 { focus-workspace 10; }
+    Mod+Shift+1 { move-column-to-workspace 1; }
+    Mod+Shift+2 { move-column-to-workspace 2; }
+    Mod+Shift+3 { move-column-to-workspace 3; }
+    Mod+Shift+4 { move-column-to-workspace 4; }
+    Mod+Shift+5 { move-column-to-workspace 5; }
+    Mod+Shift+6 { move-column-to-workspace 6; }
+    Mod+Shift+7 { move-column-to-workspace 7; }
+    Mod+Shift+8 { move-column-to-workspace 8; }
+    Mod+Shift+9 { move-column-to-workspace 9; }
+    Mod+Shift+0 { move-column-to-workspace 10; }
+    // tiling.lua's third variant of this loop, Mod+Shift+Alt+<N> ("move
+    // window silently to workspace", follow = false, i.e. focus stays put),
+    // has no niri equivalent -- move-column-to-workspace always switches
+    // focus to the target workspace. Not ported.
+
+    // Next/previous/former workspace. Niri's dynamic workspace model has no
+    // exact "e+1"/"e-1"/"previous" like Hyprland's; focus-workspace-down/up
+    // is niri's own next/previous idiom, and focus-workspace-previous is
+    // its "former workspace" equivalent.
+    Mod+Tab       { focus-workspace-down; }
+    Mod+Shift+Tab { focus-workspace-up; }
+    Mod+Ctrl+Tab  { focus-workspace-previous; }
+    // Scroll-wheel equivalent of the same next/previous idiom, ported from
+    // niri's own default-config.kdl example (cooldown-ms avoids scrolling
+    // through workspaces too fast) -- matches tiling.lua's
+    // SUPER+mouse_down/mouse_up "scroll active workspace forward/backward".
+    Mod+WheelScrollDown cooldown-ms=150 { focus-workspace-down; }
+    Mod+WheelScrollUp   cooldown-ms=150 { focus-workspace-up; }
+
+    // Move a whole workspace to an adjacent monitor.
+    Mod+Shift+Alt+Left  { move-workspace-to-monitor-left; }
+    Mod+Shift+Alt+Right { move-workspace-to-monitor-right; }
+    Mod+Shift+Alt+Up    { move-workspace-to-monitor-up; }
+    Mod+Shift+Alt+Down  { move-workspace-to-monitor-down; }
+
+    // Fullscreen, floating, close. Niri only has one fullscreen concept
+    // (fullscreen-window), so Mod+F takes it, matching Hyprland's own
+    // Mod+F ("Full screen"; Mod+Ctrl+F's "Tiled full screen" distinction
+    // has no niri equivalent -- see the drop-list comment below).
+    Mod+F { fullscreen-window; }
+    // "Full width" (Mod+Alt+F in tiling.lua) maximizes the window's column
+    // width while it stays part of the tiling layout -- niri's real
+    // equivalent for that is maximize-column, not fullscreen-window.
+    Mod+Alt+F { maximize-column; }
+    Mod+T { toggle-window-floating; }
+    Mod+W { close-window; }
+
+    // Percentage-based resize. Hyprland's config has three pixel-amount
+    // tiers (plain/Alt "a little"/Ctrl "a lot"); niri's set-column-width and
+    // set-window-height take a percentage instead of a pixel count, which
+    // doesn't split into three tiers the same way, so this uses one
+    // reasonable default percentage rather than inventing arbitrary tiers.
+    Mod+Minus { set-column-width "-10%"; }
+    Mod+Equal { set-column-width "+10%"; }
+    Mod+Shift+Minus { set-window-height "-10%"; }
+    Mod+Shift+Equal { set-window-height "+10%"; }
+
+    // Consume/expel: niri's own idiom for moving a window in and out of a
+    // column, with no Hyprland concept to translate from. Bound anyway
+    // since it's core to niri's tiling model, using niri's own suggested
+    // keys.
+    Mod+BracketLeft  { consume-or-expel-window-left; }
+    Mod+BracketRight { consume-or-expel-window-right; }
+
+    // Monitor scaling: no omarchy-niri-monitor-scaling script existed
+    // before this task, so bin/omarchy-niri-monitor-scaling was added
+    // alongside this file, following omarchy-hyprland-monitor-scaling's own
+    // up/down/direct-value structure but built on `niri msg output <name>
+    // scale <value>` instead of hyprctl.
+    Mod+Slash     { spawn "omarchy-niri-monitor-scaling" "up"; }
+    Mod+Alt+Slash { spawn "omarchy-niri-monitor-scaling" "down"; }
+
+    // Mouse-drag move/resize (tiling.lua's SUPER+mouse:272/273) needs no
+    // bind entry: niri moves/resizes windows on Mod+Left-drag/Mod+Right-drag
+    // as fixed built-in input handling, not a configurable bind action (no
+    // matching action exists in `niri msg action --help`).
+
+    // The following Hyprland tiling.lua bindings have no Niri
+    // equivalent and are intentionally not ported (see
+    // docs/superpowers/specs/2026-08-25-omarchy-niri-config-design.md,
+    // "Explicitly dropped: no real niri equivalent"):
+    //   - Window grouping (Mod+G, Mod+Alt+G, Mod+Alt+Left/Right/Up/Down
+    //     into-group, Mod+Alt+Tab group-cycle, Mod+Ctrl+Left/Right
+    //     grouped-focus, plus this file's Mod+Alt+Shift+Tab group-prev,
+    //     Mod+Alt+mouse_down/up group-cycle, and Mod+Alt+code:10-14
+    //     switch-to-group-window binds) -- niri only has tabbed *columns*, a
+    //     structurally different, column-scoped concept.
+    //   - Scratchpad (Mod+S toggle, Mod+Alt+S move-to-scratchpad) -- niri
+    //     has no floating hidden-workspace concept.
+    //   - Dwindle/pseudo-tiling toggle (Mod+J toggle-split, Mod+P
+    //     pseudo) -- niri has one layout model, no alternate layouts.
+    //     (Mod+J is reused above for focus-window-down, niri's own idiom.)
+    //   - Workspace-layout save/restore (Mod+L) and everything in
+    //     default/hypr/workspace-layouts.lua -- same reason, niri has no
+    //     per-workspace layout concept to save/restore at all. (Mod+L is
+    //     reused above for focus-column-right, niri's own idiom.)
+    //   - Window swap (Mod+Shift+Up/Down) -- niri does have real
+    //     swap-window-left/right actions for the horizontal axis (confirmed
+    //     via `niri msg action --help`), but Mod+Shift+Left/Right is
+    //     already used above for focus-monitor-left/right, following niri's
+    //     own suggested layout, and there is no swap-window-up/down at all;
+    //     not ported, to avoid a misleading partial translation of a
+    //     4-direction Hyprland binding down to 2 directions on a
+    //     conflicting key.
+    //   - "Close all windows" (Ctrl+Alt+Delete, no Mod) -- no niri action
+    //     closes every window at once.
+    //   - "Pop window out" (Mod+O; float + pin + raise-to-top) and window-
+    //     width save/restore (Mod+Alt+Home save, Mod+Home restore) -- both
+    //     are omarchy-hyprland-window-* scripts built entirely on hyprctl
+    //     pin/z-order/resize-probing, Hyprland-internals-specific with no
+    //     niri concept (window pinning, z-order) to call instead.
+    //   - Alt-Tab window cycling (Alt+Tab/Alt+Shift+Tab cycle_next/prev and
+    //     bring_to_top) -- niri has no full MRU window-cycle or
+    //     bring-to-front/z-order action; the closest, focus-window-previous,
+    //     only toggles back to the single last-focused window with no
+    //     forward direction, different enough behavior that mapping it here
+    //     would be misleading.

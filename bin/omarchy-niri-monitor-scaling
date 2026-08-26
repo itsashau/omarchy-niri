@@ -1,0 +1,82 @@
+#!/bin/bash
+
+# omarchy:summary=Show, set, or adjust focused Niri output scaling
+# omarchy:args=[up|down|SCALE]
+# omarchy:examples=omarchy niri monitor scaling | omarchy niri monitor scaling 1.6 | omarchy niri monitor scaling up | omarchy niri monitor scaling down
+
+# Niri equivalent of omarchy-hyprland-monitor-scaling, following its
+# up/down/direct-value structure. Simpler than the Hyprland version because
+# niri accepts any scale value directly (no whole-logical-pixel divisor
+# constraint to round to) and has no monitors.lua-style config file to
+# persist a chosen scale into.
+
+SCALES=(1 1.25 1.6 2 3 4)
+
+usage() {
+  echo "Usage: omarchy-niri-monitor-scaling [up|down|SCALE]" >&2
+}
+
+focused_output_name() {
+  niri msg -j focused-output | jq -r '.name // empty'
+}
+
+current_scale() {
+  local name="$1"
+
+  niri msg -j outputs | jq -r --arg name "$name" '.[$name].logical.scale // empty'
+}
+
+set_scale() {
+  local name="$1"
+  local scale="$2"
+
+  niri msg output "$name" scale "$scale" >/dev/null
+}
+
+# Picks the preset adjacent to the output's current scale.
+step_scale() {
+  local direction="$1"
+  local current="$2"
+
+  awk -v direction="$direction" -v current="$current" -v list="${SCALES[*]}" '
+    BEGIN {
+      n = split(list, presets, " ")
+      best = 1; best_diff = 1e9
+      for (i = 1; i <= n; i++) {
+        diff = current - presets[i]; if (diff < 0) diff = -diff
+        if (diff < best_diff) { best_diff = diff; best = i }
+      }
+      if (direction == "up") print presets[(best < n ? best + 1 : n)]
+      else print presets[(best > 1 ? best - 1 : 1)]
+    }'
+}
+
+name=$(focused_output_name)
+[[ -n $name ]] || {
+  echo "omarchy-niri-monitor-scaling: no focused output" >&2
+  exit 1
+}
+
+case "${1:-}" in
+"")
+  current_scale "$name"
+  ;;
+-h | --help)
+  usage
+  ;;
+up)
+  set_scale "$name" "$(step_scale up "$(current_scale "$name")")"
+  ;;
+down)
+  set_scale "$name" "$(step_scale down "$(current_scale "$name")")"
+  ;;
+*)
+  if [[ $1 =~ ^[0-9]+([.][0-9]+)?$ ]] &&
+    awk -v scale="$1" 'BEGIN { exit !(scale >= 1 && scale <= 4) }'; then
+    set_scale "$name" "$1"
+  else
+    usage
+    exit 1
+  fi
+  ;;
+esac
