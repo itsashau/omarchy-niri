@@ -17,6 +17,14 @@
 // explicit config needed. Verify live in the VM (see this plan's
 // closing Verification section) before adding explicit config here.
 
+// looknfeel.lua's misc.focus_on_activate, misc.anr_missed_pings,
+// misc.on_focus_under_fullscreen, and misc.initial_workspace_tracking
+// are Hyprland-internal behavior tuning with no matching node anywhere
+// in niri's KDL schema (confirmed via a full node-name dump of the niri
+// binary on the project's dev VM) — niri already honors xdg-activation
+// focus requests by default. Dropped, no niri equivalent; not owned by
+// any other task in this project's Niri config plan either.
+
 input {
     // sensitivity = 0 in input.lua matches niri's own accel-speed
     // default (0.0) — nothing to port there. follow_mouse = 1 is
@@ -89,20 +97,44 @@ input {
     }
 }
 
-// looknfeel.lua's general.layout = "dwindle" and its group{}/groupbar
-// styling (tabbed-window borders/fonts/colors) have no niri equivalent —
-// niri has exactly one layout model and no window-grouping concept (see
-// bindings.kdl's "Explicitly dropped" list). looknfeel.lua's dwindle{},
-// scrolling{}, and master{} blocks only configure layouts other than the
-// active "dwindle" one anyway, so none of that was live Hyprland
-// behavior to begin with — nothing lost by not porting it.
+// looknfeel.lua's general.layout = "dwindle" is Hyprland's active tiling
+// algorithm, but niri has exactly one layout model (scrollable columns)
+// with no per-workspace choice between algorithms to port dwindle to —
+// dropped, no niri equivalent (not "dead config"; see bindings.kdl's
+// "Explicitly dropped" list for the SUPER+L toggle this feeds).
+// looknfeel.lua's scrolling{} block configures Hyprland's *other* tiling
+// algorithm, reachable live via SUPER+L
+// (bin/omarchy-hyprland-workspace-layout-toggle, persisted per-workspace
+// by default/hypr/workspace-layouts.lua) — real, live behavior, not
+// inert. But niri's own model already IS "always scrolling columns", so
+// the per-workspace dwindle/scrolling *choice* Hyprland toggles between
+// doesn't exist to preserve either way; the one value from that block
+// worth carrying over, column_width, is ported below as
+// default-column-width. looknfeel.lua's master.new_status is genuinely
+// dead: SUPER+L's toggle only ever selects dwindle or scrolling, never
+// master — nothing to port there.
+// group{}/groupbar styling (tabbed-window borders/fonts/colors) has no
+// niri equivalent either — niri only has tabbed *columns*
+// (toggle-column-tabbed-display), a different, column-scoped concept
+// (see bindings.kdl's drop list).
 // general.resize_on_border and general.allow_tearing also have no niri
 // config equivalent (confirmed against niri's full KDL schema on the
 // project's dev VM: no matching node exists in either the layout or
 // output config) — both are already off/false in this theme, so this is
 // moot either way, not a gap.
+// niri does support blur, just not as a global layout{} toggle like
+// Hyprland's decoration.blur — it's a per-window-rule/layer-rule effect
+// instead (window-rule/layer-rule { background-effect { blur true } },
+// confirmed valid on the dev VM). Not enabled here since looknfeel.lua
+// has blur.enabled = false; noted for whoever writes window-rules.kdl.
 layout {
     gaps 8
+
+    // looknfeel.lua's scrolling.column_width = 0.49 — see the comment
+    // above; niri's own default is proportion 0.5.
+    default-column-width {
+        proportion 0.49
+    }
 
     focus-ring {
         off
@@ -110,7 +142,14 @@ layout {
 
     border {
         width 2
-        active-color "#33ccff"
+        // Faithful port of looknfeel.lua's 2-stop 45° active-border
+        // gradient (rgba(33ccffee) -> rgba(00ff99ee)), not collapsed to
+        // a flat color — a flat approximation would silently drop the
+        // second color stop, angle, and alpha, which this plan's own
+        // Global Constraints forbid. Overridden live by the theme system
+        // the moment it has run (see the include below); this is only
+        // the pre-theme-system fallback.
+        active-gradient from="#33ccffee" to="#00ff99ee" angle=45
         inactive-color "#595959aa"
     }
 
@@ -119,6 +158,12 @@ layout {
     }
 }
 
+// looknfeel.lua's cursor.warp_on_change_workspace = 1 has a near-niri-
+// equivalent, input { warp-mouse-to-focus mode="center-xy-always" }
+// (confirmed valid on the dev VM) — but niri's version warps the mouse
+// on every focus change, not just workspace switches, which is broader
+// than Hyprland's setting. Deliberately not enabled: it would add
+// mouse-jump-on-window-focus behavior Hyprland doesn't have here.
 cursor {
     hide-when-typing
 }
