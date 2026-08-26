@@ -232,6 +232,20 @@ binds {
     // and niri rejects a key combo bound twice. Mod+Up still reaches
     // focus-window-up.
 
+    // Directional column/window move -- niri's own real equivalent of
+    // tiling.lua's SUPER+SHIFT+arrow "swap window" binds (see the drop-list
+    // comment below for why this isn't a true swap). Same Mod+Ctrl+arrows
+    // layout as niri's own default-config.kdl. Only J is free of this set's
+    // hjkl keys -- H/K/L are already bound above to the Hardware menu, Herdr
+    // keybindings, and Lock system (utilities.lua, Task 2) -- so those three
+    // are skipped rather than double-bound; the arrow keys still cover all
+    // four directions.
+    Mod+Ctrl+Left  { move-column-left; }
+    Mod+Ctrl+Right { move-column-right; }
+    Mod+Ctrl+Up    { move-window-up; }
+    Mod+Ctrl+Down  { move-window-down; }
+    Mod+Ctrl+J     { move-window-down; }
+
     // Directional monitor focus, same arrows+hjkl pattern, following niri's
     // own default-config.kdl key choice (Mod+Shift+...) since tiling.lua has
     // no directional monitor-focus bind of its own to preserve a key from.
@@ -299,11 +313,16 @@ binds {
     Mod+Shift+Alt+Up    { move-workspace-to-monitor-up; }
     Mod+Shift+Alt+Down  { move-workspace-to-monitor-down; }
 
-    // Fullscreen, floating, close. Niri only has one fullscreen concept
-    // (fullscreen-window), so Mod+F takes it, matching Hyprland's own
-    // Mod+F ("Full screen"; Mod+Ctrl+F's "Tiled full screen" distinction
-    // has no niri equivalent -- see the drop-list comment below).
+    // Fullscreen, floating, close. Mod+F matches Hyprland's own Mod+F
+    // ("Full screen") for muscle memory.
     Mod+F { fullscreen-window; }
+    // Mod+Ctrl+F ("Tiled full screen" in tiling.lua) does have a real niri
+    // equivalent after all: omarchy-hyprland-window-tiled-fullscreen-toggle
+    // uses fullscreenstate 0 2 (window stays tiled, app is just told it's
+    // fullscreen), which is exactly niri's toggle-windowed-fullscreen
+    // ("Toggle windowed (fake) fullscreen on the focused window", confirmed
+    // via `niri msg action toggle-windowed-fullscreen --help`).
+    Mod+Ctrl+F { toggle-windowed-fullscreen; }
     // "Full width" (Mod+Alt+F in tiling.lua) maximizes the window's column
     // width while it stays part of the tiling layout -- niri's real
     // equivalent for that is maximize-column, not fullscreen-window.
@@ -333,8 +352,8 @@ binds {
     // alongside this file, following omarchy-hyprland-monitor-scaling's own
     // up/down/direct-value structure but built on `niri msg output <name>
     // scale <value>` instead of hyprctl.
-    Mod+Slash     { spawn "omarchy-niri-monitor-scaling" "up"; }
-    Mod+Alt+Slash { spawn "omarchy-niri-monitor-scaling" "down"; }
+    Mod+Slash     hotkey-overlay-title="Monitor scaling up" { spawn "omarchy-niri-monitor-scaling" "up"; }
+    Mod+Alt+Slash hotkey-overlay-title="Monitor scaling down" { spawn "omarchy-niri-monitor-scaling" "down"; }
 
     // Mouse-drag move/resize (tiling.lua's SUPER+mouse:272/273) needs no
     // bind entry: niri moves/resizes windows on Mod+Left-drag/Mod+Right-drag
@@ -360,14 +379,18 @@ binds {
     //     default/hypr/workspace-layouts.lua -- same reason, niri has no
     //     per-workspace layout concept to save/restore at all. (Mod+L is
     //     reused above for focus-column-right, niri's own idiom.)
-    //   - Window swap (Mod+Shift+Up/Down) -- niri does have real
+    //   - Window swap (Mod+Shift+Left/Right/Up/Down) -- no true "swap two
+    //     windows" binding is ported. The directional move-column/
+    //     move-window binds above (Mod+Ctrl+arrows) now cover the same
+    //     underlying need (repositioning a window/column) under niri's own
+    //     idiom, per the design spec. Niri does have real
     //     swap-window-left/right actions for the horizontal axis (confirmed
     //     via `niri msg action --help`), but Mod+Shift+Left/Right is
     //     already used above for focus-monitor-left/right, following niri's
     //     own suggested layout, and there is no swap-window-up/down at all;
-    //     not ported, to avoid a misleading partial translation of a
-    //     4-direction Hyprland binding down to 2 directions on a
-    //     conflicting key.
+    //     swap-window-left/right isn't bound anywhere, to avoid a misleading
+    //     partial translation of a 4-direction Hyprland binding down to 2
+    //     directions on a conflicting key.
     //   - "Close all windows" (Ctrl+Alt+Delete, no Mod) -- no niri action
     //     closes every window at once.
     //   - "Pop window out" (Mod+O; float + pin + raise-to-top) and window-
