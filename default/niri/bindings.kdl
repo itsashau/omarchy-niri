@@ -1,3 +1,213 @@
 // Omarchy keybindings for Niri, translated from default/hypr/bindings/*.lua.
 // Populated by later tasks in this plan; see
 // docs/superpowers/plans/2026-08-25-omarchy-niri-config.md.
+
+// Lid-switch handling (default/hypr/bindings/utilities.lua). This is a
+// top-level switch-events node, not a keyboard bind -- and per niri's own
+// docs, switch-event binds always run regardless of lock state, so
+// Hyprland's { locked = true } option on these two has no niri property
+// to port.
+switch-events {
+    lid-close { spawn "omarchy-system-lid-close"; }
+    // omarchy-hyprland-monitor-clamshell drives hyprctl directly and is
+    // Hyprland-specific by name; ported as-is per this plan's mechanical
+    // translation scope (same situation as autostart's
+    // omarchy-hyprland-monitor-watch, per the design spec) -- a niri-native
+    // monitor-reconciliation script is a separate, later concern.
+    lid-open { spawn "omarchy-hyprland-monitor-clamshell"; }
+}
+
+// binds{} is intentionally left open (no closing brace) -- Tasks 3-5 append
+// window-management and remaining bindings into this same block and close
+// it when done.
+binds {
+    // ---- Applications (default/hypr/bindings/applications.lua) ----
+    Mod+Return hotkey-overlay-title="Terminal" { spawn "omarchy-launch-terminal"; }
+    Mod+Shift+Return hotkey-overlay-title="Browser" { spawn "omarchy-launch-browser"; }
+    Mod+Shift+F hotkey-overlay-title="File manager" { spawn "omarchy-launch-nautilus"; }
+    Mod+Alt+Shift+F hotkey-overlay-title="File manager (cwd)" { spawn "omarchy-launch-nautilus-cwd"; }
+    Mod+Shift+B hotkey-overlay-title="Browser" { spawn "omarchy-launch-browser"; }
+    Mod+Shift+Alt+B hotkey-overlay-title="Browser (private)" { spawn "omarchy-launch-browser" "--private"; }
+    Mod+Shift+N hotkey-overlay-title="Editor" { spawn "omarchy-launch-editor"; }
+
+    // The following app/webapp bindings are unconditional here; Hyprland's
+    // config gates them on o.preinstalled_bindings_enabled() (a runtime
+    // state-file check for whether preinstalled apps were removed), which
+    // this static file can't replicate. Revisit if that ever needs porting.
+    Mod+Alt+Return hotkey-overlay-title="Tmux" { spawn "omarchy-launch-terminal-tmux"; }
+    Mod+Ctrl+Return hotkey-overlay-title="Herdr" { spawn "omarchy-launch-terminal-herdr"; }
+    Mod+Shift+M hotkey-overlay-title="Music" { spawn "omarchy-launch-spotify"; }
+    Mod+Shift+Alt+M hotkey-overlay-title="Music TUI" { spawn "omarchy-launch-or-focus-tui" "cliamp"; }
+    Mod+Shift+D hotkey-overlay-title="Docker" { spawn "omarchy-launch-tui" "lazydocker"; }
+    Mod+Shift+G hotkey-overlay-title="Signal" { spawn "omarchy-launch-signal"; }
+    Mod+Shift+O hotkey-overlay-title="Obsidian" { spawn "omarchy-launch-or-focus" "^obsidian$" "uwsm-app -- obsidian"; }
+    Mod+Shift+W hotkey-overlay-title="Omawrite" { spawn "uwsm-app" "--" "omawrite"; }
+    Mod+Shift+Slash hotkey-overlay-title="Passwords" { spawn "omarchy-launch-1password"; }
+
+    Mod+Shift+A hotkey-overlay-title="ChatGPT" { spawn "omarchy-launch-webapp" "https://chatgpt.com"; }
+    Mod+Shift+Alt+A hotkey-overlay-title="Grok" { spawn "omarchy-launch-webapp" "https://grok.com"; }
+    Mod+Shift+C hotkey-overlay-title="Calendar" { spawn "omarchy-launch-webapp" "https://app.hey.com/calendar/weeks/"; }
+    Mod+Shift+E hotkey-overlay-title="Email" { spawn "omarchy-launch-webapp" "https://app.hey.com"; }
+    Mod+Shift+Alt+E hotkey-overlay-title="New email" { spawn "omarchy-launch-webapp" "https://app.hey.com/messages/new?display=standalone&new_window=true"; }
+    Mod+Shift+Y hotkey-overlay-title="YouTube" { spawn "omarchy-launch-webapp" "https://youtube.com/"; }
+    Mod+Shift+Alt+G hotkey-overlay-title="WhatsApp" { spawn "omarchy-launch-or-focus-webapp" "WhatsApp" "https://web.whatsapp.com/"; }
+    Mod+Shift+Ctrl+G hotkey-overlay-title="Google Messages" { spawn "omarchy-launch-or-focus-webapp" "Google Messages" "https://messages.google.com/web/conversations"; }
+    Mod+Shift+P hotkey-overlay-title="Google Photos" { spawn "omarchy-launch-or-focus-webapp" "Google Photos" "https://photos.google.com/"; }
+    Mod+Shift+S hotkey-overlay-title="Google Maps" { spawn "omarchy-launch-or-focus-webapp" "Google Maps" "https://maps.google.com/"; }
+    Mod+Shift+X hotkey-overlay-title="X" { spawn "omarchy-launch-webapp" "https://x.com/"; }
+    Mod+Shift+Alt+X hotkey-overlay-title="X Post" { spawn "omarchy-launch-webapp" "https://x.com/compose/post"; }
+
+    // ---- Media, volume, brightness (default/hypr/bindings/media.lua) ----
+    XF86AudioRaiseVolume allow-when-locked=true hotkey-overlay-title="Volume up" { spawn "omarchy-audio-output-volume" "raise"; }
+    XF86AudioLowerVolume allow-when-locked=true hotkey-overlay-title="Volume down" { spawn "omarchy-audio-output-volume" "lower"; }
+    XF86AudioMute allow-when-locked=true hotkey-overlay-title="Mute" { spawn "omarchy-audio-output-volume" "mute-toggle"; }
+    XF86AudioMicMute allow-when-locked=true hotkey-overlay-title="Mute microphone" { spawn "omarchy-audio-input-mute"; }
+    XF86MonBrightnessUp allow-when-locked=true hotkey-overlay-title="Brightness up" { spawn "omarchy-brightness-display" "+5%"; }
+    XF86MonBrightnessDown allow-when-locked=true hotkey-overlay-title="Brightness down" { spawn "omarchy-brightness-display" "5%-"; }
+    Shift+XF86MonBrightnessUp allow-when-locked=true hotkey-overlay-title="Brightness maximum" { spawn "omarchy-brightness-display" "100%"; }
+    Shift+XF86MonBrightnessDown allow-when-locked=true hotkey-overlay-title="Brightness minimum" { spawn "omarchy-brightness-display" "1%"; }
+    XF86KbdBrightnessUp allow-when-locked=true hotkey-overlay-title="Keyboard brightness up" { spawn "omarchy-brightness-keyboard" "up"; }
+    XF86KbdBrightnessDown allow-when-locked=true hotkey-overlay-title="Keyboard brightness down" { spawn "omarchy-brightness-keyboard" "down"; }
+    XF86KbdLightOnOff allow-when-locked=true hotkey-overlay-title="Keyboard backlight cycle" { spawn "omarchy-brightness-keyboard" "cycle"; }
+    XF86TouchpadToggle allow-when-locked=true hotkey-overlay-title="Toggle touchpad" { spawn "omarchy-toggle-touchpad"; }
+    XF86TouchpadOn allow-when-locked=true hotkey-overlay-title="Enable touchpad" { spawn "omarchy-toggle-touchpad" "on"; }
+    XF86TouchpadOff allow-when-locked=true hotkey-overlay-title="Disable touchpad" { spawn "omarchy-toggle-touchpad" "off"; }
+
+    Alt+XF86AudioRaiseVolume allow-when-locked=true hotkey-overlay-title="Volume up precise" { spawn "omarchy-audio-output-volume" "+1"; }
+    Alt+XF86AudioLowerVolume allow-when-locked=true hotkey-overlay-title="Volume down precise" { spawn "omarchy-audio-output-volume" "-1"; }
+    Alt+XF86MonBrightnessUp allow-when-locked=true hotkey-overlay-title="Brightness up precise" { spawn "omarchy-brightness-display" "+1%"; }
+    Alt+XF86MonBrightnessDown allow-when-locked=true hotkey-overlay-title="Brightness down precise" { spawn "omarchy-brightness-display" "1%-"; }
+
+    XF86AudioNext allow-when-locked=true hotkey-overlay-title="Next track" { spawn "omarchy-shell" "media" "next"; }
+    Alt+XF86AudioPlay allow-when-locked=true hotkey-overlay-title="Next track" { spawn "omarchy-shell" "media" "next"; }
+    XF86AudioPause allow-when-locked=true hotkey-overlay-title="Pause" { spawn "omarchy-shell" "media" "playPause"; }
+    XF86AudioPlay allow-when-locked=true hotkey-overlay-title="Play" { spawn "omarchy-shell" "media" "playPause"; }
+    XF86AudioPrev allow-when-locked=true hotkey-overlay-title="Previous track" { spawn "omarchy-shell" "media" "previous"; }
+    Alt+Shift+XF86AudioPlay allow-when-locked=true hotkey-overlay-title="Previous track" { spawn "omarchy-shell" "media" "previous"; }
+    XF86Eject allow-when-locked=true hotkey-overlay-title="Eject media" { spawn "eject"; }
+
+    Shift+XF86AudioMute allow-when-locked=true hotkey-overlay-title="Switch audio output" { spawn "omarchy-audio-output-switch"; }
+    Shift+XF86AudioPause allow-when-locked=true hotkey-overlay-title="Switch media source" { spawn "omarchy-audio-source-switch"; }
+    Shift+XF86AudioPlay allow-when-locked=true hotkey-overlay-title="Switch media source" { spawn "omarchy-audio-source-switch"; }
+
+    // ---- Utilities: menus, notifications, screenshots (default/hypr/bindings/utilities.lua) ----
+    Mod+Space hotkey-overlay-title="Omarchy menu" { spawn "omarchy-menu" "toggle"; }
+    Mod+Alt+Space hotkey-overlay-title="Apps menu" { spawn "omarchy-menu" "toggle" "apps"; }
+    Mod+Ctrl+E hotkey-overlay-title="Emojis" { spawn "omarchy-shell" "shell" "toggle" "omarchy.emojis"; }
+    Mod+Ctrl+C hotkey-overlay-title="Capture menu" { spawn "omarchy-menu" "toggle" "capture"; }
+    Mod+Ctrl+O hotkey-overlay-title="Toggle menu" { spawn "omarchy-menu" "toggle" "toggle"; }
+    Mod+Ctrl+H hotkey-overlay-title="Hardware menu" { spawn "omarchy-menu" "toggle" "hardware"; }
+    // Hyprland's code:N binds are raw X11 keycodes, which follow the
+    // standard X11 convention of evdev keycode + 8 (confirmed against
+    // /usr/include/linux/input-event-codes.h: code:20/code:21 here resolve
+    // to KEY_MINUS/KEY_EQUAL, i.e. -/=, and code:34/code:35 below resolve to
+    // KEY_LEFTBRACE/KEY_RIGHTBRACE, i.e. [/] -- both sensible mnemonics that
+    // confirm the offset). code:201 - 8 = evdev 193 = KEY_F23. niri binds by
+    // XKB keysym name, not raw keycode, so this becomes the F23 keysym.
+    Mod+Shift+F23 hotkey-overlay-title="Omarchy menu" { spawn "omarchy-menu" "toggle" "root"; }
+    Mod+Escape hotkey-overlay-title="System menu" { spawn "omarchy-menu" "toggle" "system"; }
+    XF86PowerOff allow-when-locked=true hotkey-overlay-title="Power menu" { spawn "omarchy-menu" "toggle" "system"; }
+    Mod+K hotkey-overlay-title="Keybindings" { spawn "omarchy-menu-keybindings"; }
+    Mod+Alt+K hotkey-overlay-title="Tmux keybindings" { spawn "omarchy-menu-tmux-keybindings"; }
+    Mod+Ctrl+K hotkey-overlay-title="Herdr keybindings" { spawn "omarchy-menu-herdr-keybindings"; }
+    Mod+Ctrl+Q hotkey-overlay-title="Calculator" { spawn "omacalc"; }
+    XF86Calculator hotkey-overlay-title="Calculator" { spawn "omacalc"; }
+
+    Mod+Shift+Space hotkey-overlay-title="Toggle top bar" { spawn "omarchy-toggle-bar"; }
+    Mod+Ctrl+Space hotkey-overlay-title="Background switcher" { spawn "omarchy-menu" "toggle" "background"; }
+    Mod+Shift+Ctrl+Space hotkey-overlay-title="Theme menu" { spawn "omarchy-menu" "toggle" "theme"; }
+    // The three omarchy-hyprland-window-*-toggle commands below drive
+    // hyprctl directly and are Hyprland-specific by name; ported as-is per
+    // this plan's mechanical translation scope (same situation as the
+    // lid-switch monitor script above) -- a niri-native equivalent is a
+    // separate, later concern.
+    Mod+BackSpace hotkey-overlay-title="Toggle window transparency" { spawn "omarchy-hyprland-window-transparency-toggle"; }
+    Mod+Shift+BackSpace hotkey-overlay-title="Toggle window gaps" { spawn "omarchy-hyprland-window-gaps-toggle"; }
+    Mod+Ctrl+BackSpace hotkey-overlay-title="Toggle single-window square aspect" { spawn "omarchy-hyprland-window-single-square-aspect-toggle"; }
+
+    Mod+Comma hotkey-overlay-title="Dismiss last notification" { spawn "omarchy-shell" "notifications" "dismissOne"; }
+    Mod+Shift+Comma hotkey-overlay-title="Dismiss all notifications" { spawn "omarchy-shell" "notifications" "dismissAll"; }
+    Mod+Ctrl+Comma hotkey-overlay-title="Toggle silencing notifications" { spawn "omarchy-toggle-notification-silencing"; }
+    Mod+Alt+Comma hotkey-overlay-title="Invoke last notification" { spawn "omarchy-shell" "notifications" "invokeLast"; }
+    Mod+Shift+Alt+Comma hotkey-overlay-title="Open notification history" { spawn "omarchy-shell" "notifications" "showHistory"; }
+
+    Mod+Ctrl+I hotkey-overlay-title="Toggle locking on idle" { spawn "omarchy-toggle-idle"; }
+    Mod+Ctrl+N hotkey-overlay-title="Toggle nightlight" { spawn "omarchy-toggle-nightlight"; }
+    // omarchy-hyprland-monitor-internal(-mirror) below drive hyprctl
+    // directly and are Hyprland-specific by name; ported as-is, same
+    // rationale as above.
+    Mod+Ctrl+Delete hotkey-overlay-title="Toggle laptop display" { spawn "omarchy-hyprland-monitor-internal" "toggle"; }
+    Mod+Ctrl+Alt+Delete hotkey-overlay-title="Toggle laptop display mirroring" { spawn "omarchy-hyprland-monitor-internal-mirror" "toggle"; }
+    // Lid switch binds (switch:on:"Lid Switch" / switch:off:"Lid Switch")
+    // are ported above as a top-level switch-events{} node, not here -- see
+    // the comment at the top of this file.
+
+    Print hotkey-overlay-title="Screenshot" { spawn "omarchy-capture-screenshot"; }
+    Alt+Print hotkey-overlay-title="Screenrecording" { spawn-sh "omarchy-capture-screenrecording --stop-recording || omarchy-menu toggle trigger.capture.screenrecord"; }
+    // code:34/code:35 -> evdev 26/27 (X11 keycode - 8) -> KEY_LEFTBRACE /
+    // KEY_RIGHTBRACE, i.e. the [ and ] keys (see the code:201 note above for
+    // the evdev+8 derivation this relies on).
+    Mod+Alt+bracketleft hotkey-overlay-title="Make webcam overlay smaller" { spawn "omarchy-capture-webcam-resize" "smaller"; }
+    Mod+Alt+bracketright hotkey-overlay-title="Make webcam overlay larger" { spawn "omarchy-capture-webcam-resize" "larger"; }
+    Mod+Print hotkey-overlay-title="Color picker" { spawn-sh "pkill hyprpicker || hyprpicker -a"; }
+    Mod+Ctrl+Print hotkey-overlay-title="Extract text (OCR) from screenshot" { spawn "omarchy-capture-text"; }
+
+    Mod+Ctrl+S hotkey-overlay-title="Share" { spawn "omarchy-menu" "toggle" "share"; }
+
+    Mod+Ctrl+Period hotkey-overlay-title="Transcode" { spawn "omarchy-transcode"; }
+
+    Mod+Ctrl+R hotkey-overlay-title="Set reminder" { spawn "omarchy-menu" "toggle" "reminder-set"; }
+    Mod+Ctrl+Alt+R hotkey-overlay-title="Show reminders" { spawn "omarchy-reminder" "show"; }
+    Mod+Shift+Ctrl+R hotkey-overlay-title="Clear reminders" { spawn "omarchy-reminder" "clear"; }
+
+    Mod+Ctrl+Alt+T hotkey-overlay-title="Show time" { spawn "omarchy-notification-time"; }
+    Mod+Ctrl+Alt+B hotkey-overlay-title="Show battery remaining" { spawn "omarchy-notification-battery"; }
+    Mod+Ctrl+Alt+W hotkey-overlay-title="Toggle weather" { spawn "omarchy-notification-weather"; }
+
+    Mod+Shift+Ctrl+A hotkey-overlay-title="Agent" { spawn "omarchy-agent" "--pick"; }
+    Mod+Ctrl+A hotkey-overlay-title="Audio" { spawn "omarchy-shell" "shell" "toggle" "omarchy.audio"; }
+    Mod+Ctrl+B hotkey-overlay-title="Bluetooth" { spawn "omarchy-shell" "shell" "toggle" "omarchy.bluetooth"; }
+    Mod+Ctrl+D hotkey-overlay-title="Display" { spawn "omarchy-shell" "shell" "toggle" "omarchy.monitor"; }
+    Mod+Ctrl+Alt+D hotkey-overlay-title="Calendar" { spawn "omarchy-shell" "shell" "toggle" "omarchy.clock"; }
+    Mod+Ctrl+W hotkey-overlay-title="Network" { spawn "omarchy-shell" "shell" "toggle" "omarchy.network"; }
+    Mod+Ctrl+P hotkey-overlay-title="Power" { spawn "omarchy-shell" "shell" "toggle" "omarchy.power"; }
+    Mod+Ctrl+T hotkey-overlay-title="Activity" { spawn "omarchy-launch-tui" "btop"; }
+
+    // The letters above name a panel; the numbers count them. 1 is the
+    // leftmost panel in the bar's right section, and a widget with no panel
+    // of its own (the tray) is not counted, so the number matches the icon a
+    // user would point at. A bar with fewer panels than this leaves the tail
+    // of the range doing nothing. code:(panel+9) uses the same evdev+8
+    // keycode convention noted above: code:10..code:18 -> evdev 2..10 ->
+    // KEY_1..KEY_9, the physical top-row digit keys 1-9.
+    Mod+Ctrl+1 hotkey-overlay-title="Bar panel 1" { spawn "omarchy-shell" "-q" "shell" "togglePanelAt" "right" "1"; }
+    Mod+Ctrl+2 hotkey-overlay-title="Bar panel 2" { spawn "omarchy-shell" "-q" "shell" "togglePanelAt" "right" "2"; }
+    Mod+Ctrl+3 hotkey-overlay-title="Bar panel 3" { spawn "omarchy-shell" "-q" "shell" "togglePanelAt" "right" "3"; }
+    Mod+Ctrl+4 hotkey-overlay-title="Bar panel 4" { spawn "omarchy-shell" "-q" "shell" "togglePanelAt" "right" "4"; }
+    Mod+Ctrl+5 hotkey-overlay-title="Bar panel 5" { spawn "omarchy-shell" "-q" "shell" "togglePanelAt" "right" "5"; }
+    Mod+Ctrl+6 hotkey-overlay-title="Bar panel 6" { spawn "omarchy-shell" "-q" "shell" "togglePanelAt" "right" "6"; }
+    Mod+Ctrl+7 hotkey-overlay-title="Bar panel 7" { spawn "omarchy-shell" "-q" "shell" "togglePanelAt" "right" "7"; }
+    Mod+Ctrl+8 hotkey-overlay-title="Bar panel 8" { spawn "omarchy-shell" "-q" "shell" "togglePanelAt" "right" "8"; }
+    Mod+Ctrl+9 hotkey-overlay-title="Bar panel 9" { spawn "omarchy-shell" "-q" "shell" "togglePanelAt" "right" "9"; }
+
+    // Mod+Ctrl+Z ("Zoom in") and Mod+Ctrl+Alt+Z ("Reset zoom") aren't
+    // ported: both call hl.get_config()/hl.config() directly to bump
+    // Hyprland's own live cursor.zoom_factor setting -- a Hyprland Lua-API
+    // call, not a shell command -- and niri has no equivalent live
+    // cursor-zoom action or config knob to call instead.
+
+    Mod+Ctrl+L hotkey-overlay-title="Lock system" { spawn "omarchy-system-lock"; }
+
+    // ---- Voice dictation (default/hypr/bindings/voxtype.lua) ----
+    // The following voxtype bindings are unconditional here; Hyprland's
+    // config gates them on o.cmd_present("voxtype") (a runtime PATH check
+    // for whether the voxtype binary is installed), which this static file
+    // can't replicate. Revisit if that ever needs porting.
+    Mod+Ctrl+X hotkey-overlay-title="Toggle dictation" { spawn "voxtype" "record" "toggle"; }
+    F9 hotkey-overlay-title="Start dictation (push-to-talk)" { spawn "voxtype" "record" "start"; }
+    // F9's stop-on-release bind ("voxtype record stop", { release = true })
+    // has no niri equivalent: niri's bind schema (niri-config/src/binds.rs,
+    // the Bind/Trigger types) only has press-triggered binds with optional
+    // repeat/cooldown-ms/allow-when-locked/allow-inhibiting properties --
+    // there is no key-release trigger concept at all. Not ported; the
+    // Mod+Ctrl+X toggle above is the only way to stop dictation under niri.
