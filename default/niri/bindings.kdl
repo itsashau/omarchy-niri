@@ -12,9 +12,6 @@ switch-events {
     lid-open { spawn "omarchy-hyprland-monitor-clamshell"; }
 }
 
-// binds{} is intentionally left open (no closing brace) -- Tasks 3-5 append
-// window-management and remaining bindings into this same block and close
-// it when done.
 binds {
     // This file ports each Hyprland binding to the same key combination
     // calling the same shell command, per this plan's mechanical-translation
@@ -404,3 +401,24 @@ binds {
     //     only toggles back to the single last-focused window with no
     //     forward direction, different enough behavior that mapping it here
     //     would be misleading.
+
+    // ---- Clipboard (default/hypr/bindings/clipboard.lua) ----
+    Mod+Ctrl+V hotkey-overlay-title="Clipboard manager" { spawn "omarchy-shell" "shell" "toggle" "omarchy.clipboard"; }
+
+    // Mod+C (universal copy), Mod+V (universal paste), Mod+X (universal
+    // cut) from default/hypr/bindings/clipboard.lua are NOT ported.
+    // Hyprland's version uses synthetic key-state injection
+    // (hl.dsp.send_key_state) to distinguish terminal-vs-GUI Ctrl+C/V
+    // behavior and reach both normal windows and layer-shell surfaces --
+    // niri's IPC has no equivalent "send this key combo to the focused
+    // surface" action. See
+    // docs/superpowers/specs/2026-08-25-omarchy-niri-config-design.md.
+
+    // default/hypr/bindings/utilities.lua also dynamically binds
+    // RETURN/CTRL+RETURN/TAB/CTRL+TAB/arrow-keys while
+    // omarchy-capture-region's slurp-based selection overlay is open
+    // (via Hyprland's layer.opened/layer.closed events). No niri
+    // equivalent event exists to replicate this. Whether
+    // omarchy-capture-region needs this at all under niri is a separate,
+    // later investigation -- not solved here.
+}
