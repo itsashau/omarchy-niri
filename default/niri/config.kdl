@@ -9,10 +9,23 @@
 // Niri (confirmed working), which may already cover this with no
 // explicit config needed. Verify live in the VM (see this plan's
 // closing Verification section) before adding explicit config here.
-// follow_mouse = 1 and sensitivity = 0 in input.lua are Hyprland's own
-// default values, not real customizations, so there's nothing to port
-// for either — niri's defaults already match this behavior.
+
 input {
+    // sensitivity = 0 in input.lua matches niri's own accel-speed
+    // default (0.0) — nothing to port there. follow_mouse = 1 is
+    // different: Hyprland's docs define mode 1 as "cursor movement will
+    // always change focus to the window under the cursor," and
+    // input.lua never overrides that default, so it's real, live
+    // focus-follows-mouse behavior Omarchy ships today — not a no-op
+    // default. niri ships focus-follows-mouse commented out (disabled)
+    // by default (see /usr/share/doc/niri/default-config.kdl), so it
+    // needs an explicit line here to preserve Hyprland's actual
+    // behavior. Using the bare node with no max-scroll-amount: that
+    // option only restricts the effect to windows already fully on
+    // screen, a stricter behavior Hyprland's follow_mouse = 1 has no
+    // equivalent restriction for.
+    focus-follows-mouse
+
     keyboard {
         xkb {
             // Layout/variant/model/rules are left unset deliberately:
