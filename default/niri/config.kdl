@@ -172,6 +172,64 @@ hotkey-overlay {
     skip-at-startup
 }
 
+// default/hypr/autostart.lua's hl.on("hyprland.start", ...) hook runs once
+// per Hyprland session start; these spawn-at-startup/spawn-sh-at-startup
+// nodes are niri's direct equivalent. omarchy-launch-shell below is what
+// closes this project's previously-noted gap: Niri didn't auto-launch the
+// Omarchy shell on login, unlike Hyprland.
+//
+// autostart.lua's own first two commands (systemctl --user
+// import-environment / dbus-update-activation-environment) are ported
+// verbatim below rather than dropped, despite genuine uncertainty about
+// whether they're redundant under niri: niri.service's unit file
+// (/usr/lib/systemd/user/niri.service, confirmed on the project's dev VM)
+// runs ExecStart=niri --session directly, with no environment import of
+// its own. The niri-session wrapper script — what niri.desktop's Exec=
+// actually points at, and what `uwsm start -n -g -1 -e -D niri
+// niri.desktop` (this project's own omarchy-niri.desktop invocation, dry
+// run) resolves "Command Line:" to — does its own systemctl --user
+// import-environment + dbus-update-activation-environment dance, but only
+// when NOT already launched as a systemd --user service; under uwsm's
+// generated wayland-wm@... service (confirmed via that same dry run),
+// niri-session takes its early-exit branch straight to `exec niri
+// --session`, skipping that dance entirely. Hyprland's own session is
+// launched by uwsm exactly the same way (omarchy.desktop: uwsm start ...
+// Hyprland hyprland.desktop) and *still* needs this fix per autostart.lua's
+// own "Slow app launch fix" comment — real-world evidence that uwsm's own
+// environment handling doesn't fully substitute for it. So this is ported
+// here as likely necessary, not cargo-culted; running it twice (once via
+// niri-session's skipped branch if this analysis is wrong, once via this
+// spawn) is harmless either way. Flagged for live confirmation per this
+// plan's own closing Verification section.
+spawn-sh-at-startup "systemctl --user import-environment $(env | cut -d'=' -f 1) && dbus-update-activation-environment --systemd --all"
+
+spawn-at-startup "omarchy-launch-shell"
+spawn-at-startup "omarchy-provision-first-run"
+spawn-at-startup "omarchy-powerprofiles-init"
+spawn-at-startup "udiskie" "--automount" "--no-notify" "--no-tray"
+spawn-sh-at-startup "sleep 2 && omarchy-hook post-boot"
+
+// autostart.lua also runs omarchy-hyprland-monitor-watch (via uwsm-app) on
+// every Hyprland session start. Read in full, its actual job is Omarchy's
+// clamshell-mode auto-disable of the laptop panel when docked with the lid
+// shut and an external monitor active (via hyprctl eval/dispatch, reading
+// hypr/monitors.lua), plus a modeless-monitor recovery loop that forces a
+// reload when a monitor reports a 0x0-mode EDID after power-on. Both are
+// Omarchy-added behaviors built entirely on Hyprland-specific plumbing
+// (hyprctl, hypr/monitors.lua, the hypr event socket) — not raw
+// hotplug-reactivity that niri's own newer, more first-class multi-monitor
+// support would already provide as a side effect. No niri equivalent of
+// any of the underlying helpers (omarchy-hyprland-monitor-clamshell,
+// -modeless, -external-active, -laptop, -internal, -internal-mirror)
+// exists in bin/ today, and porting the feature means rewriting all of
+// them against niri's own output config and `niri msg -j event-stream`'s
+// output-related events (as this project's NiriService reference,
+// shell/plugins/services/niri/Service.qml, already does for its own
+// window/workspace/keyboard-layout events) — real, separate script work
+// outside this task's scope (config.kdl only, per this task's own Files
+// list). Not added here; no startup line calls a script that doesn't
+// exist yet.
+
 // Theme colors override the border section above. optional=true means
 // this silently no-ops before the theme system has ever run (e.g. right
 // after a fresh omarchy dev link), then picks up colors the moment it
