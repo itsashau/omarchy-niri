@@ -17,6 +17,21 @@
 // floating-window's 875x600 float size), the resulting niri rules duplicate
 // that behavior per file rather than sharing one rule, to keep the
 // one-comment-header-per-source-file organization below accurate.
+//
+// Regex match semantics note: Hyprland (this repo's version, 0.56.2) uses
+// RE2::FullMatch for class/title rules — the pattern must match the ENTIRE
+// string (confirmed against Hyprland's src/desktop/rule/matchEngine/
+// RegexMatchEngine.cpp; independently corroborated by this repo's own
+// comments — terminals.lua:4 "The class is matched in full, so foot's other
+// app-id needs spelling out", and steam.lua deliberately using two separate
+// patterns, "steam" and "steam.*", which only makes sense under full-match).
+// Niri's app-id/title match is a plain substring search instead
+// (`app_id_re.0.is_match(app_id)`, confirmed at src/window/mod.rs:423).
+// Every bare/unanchored Hyprland pattern below is therefore wrapped in
+// `^(?:...)$` to reproduce Hyprland's implicit full-string anchoring;
+// patterns the original author already anchored (`^...$`) or already
+// bracketed with explicit `.*` wildcards (intentionally partial matches)
+// are left as they were.
 
 // ---- default/hypr/windows.lua ----
 
@@ -80,9 +95,11 @@ window-rule {
     // no_shadow = true -> shadow { off; }
     shadow { off; }
     // no_blur = true -> background-effect { blur false; } (confirmed field
-    // in appearance.rs's BackgroundEffectRule and niri's Window-Rules doc;
-    // currently a no-op since config.kdl's layout has blur globally off
-    // anyway, kept for parity if that ever changes).
+    // in appearance.rs's BackgroundEffectRule and niri's Window-Rules doc).
+    // Niri has no global layout-wide blur toggle at all (see config.kdl's
+    // comment on this) — blur is purely a per-rule opt-in, and no rule in
+    // this file enables it, so this is currently a no-op; kept for parity
+    // in case a future rule ever turns blur on for these windows.
     background-effect { blur false; }
 }
 
@@ -91,7 +108,7 @@ window-rule {
 // Bitwarden's own Chrome extension popup window.
 window-rule {
     match app-id=r#"^(Bitwarden)$"#
-    match app-id="chrome-nngceckbapebfimnlniiiahkandclblb-Default"
+    match app-id="^chrome-nngceckbapebfimnlniiiahkandclblb-Default$"
     block-out-from "screen-capture"
     open-floating true
     default-column-width { fixed 875; }
@@ -99,19 +116,27 @@ window-rule {
 }
 
 // ---- default/hypr/apps/browser.lua ----
-// Chromium-based browsers: forced tiled + fully opaque, except the
-// YouTube/Zoom "app mode" PWA windows, which get excluded here (their
-// WM_CLASS commonly looks like "chrome-youtube.com__...", which does match
-// the chromium app-id regex below) and handled by their own rule instead —
-// mirrors the source's tag-add-then-tag-remove ordering.
+// Chromium-based browsers: forced tiled + fully opaque. Hyprland's
+// opacity = "1.0 0.985" is a focused/unfocused pair; collapsed to the
+// single niri `opacity` field the same way the global default is (see the
+// windows.lua section above) — using the focused (fully-opaque) value.
+// No `exclude` is needed for the YouTube/Zoom "app mode" PWA windows here:
+// their WM_CLASS looks like "chrome-youtube.com__..." /
+// "chrome-app.zoom.us__wc_home...", which does NOT fullmatch (and, now
+// that the pattern below is correctly anchored with `^...$`, does not
+// niri-match either) the browser-name-only pattern below — it never
+// matched the chromium rule under Hyprland's real full-match semantics in
+// the first place, so the source's tag-remove step for these windows was
+// only ever clearing a tag they wouldn't have gotten from this rule
+// anyway. They still get their own opacity rule below regardless.
 window-rule {
-    match app-id="((google-)?[cC]hrom(e|ium)|[bB]rave-browser|[mM]icrosoft-edge|Vivaldi-stable|helium)"
-    exclude app-id=r#"(^.+-youtube\.com__.*$|^.+-app\.zoom\.us__wc_home.*$)"#
+    match app-id="^((google-)?[cC]hrom(e|ium)|[bB]rave-browser|[mM]icrosoft-edge|Vivaldi-stable|helium)$"
     open-floating false
     opacity 1.0
 }
 window-rule {
-    match app-id="([fF]irefox|zen|librewolf)"
+    match app-id="^([fF]irefox|zen|librewolf)$"
+    // Same focused/unfocused-pair collapse as the chromium rule above.
     opacity 1.0
 }
 window-rule {
@@ -155,19 +180,19 @@ window-rule {
 
 // ---- default/hypr/apps/localsend.lua ----
 window-rule {
-    match app-id="(Share|localsend)"
+    match app-id="^(Share|localsend)$"
     open-floating true
     // center = true needs no rule; see the battlenet.lua comment above.
 }
 window-rule {
-    match app-id="localsend"
+    match app-id="^localsend$"
     default-column-width { fixed 1100; }
     default-window-height { fixed 700; }
 }
 
 // ---- default/hypr/apps/moonlight.lua ----
 window-rule {
-    match app-id="com.moonlight_stream.Moonlight"
+    match app-id="^com.moonlight_stream.Moonlight$"
     open-fullscreen true
     // idle_inhibit = "fullscreen" dropped; see geforce.lua's comment.
 }
@@ -183,7 +208,7 @@ window-rule {
 
 // ---- default/hypr/apps/pip.lua ----
 window-rule {
-    match title="(Picture.?in.?[Pp]icture)"
+    match title="^(Picture.?in.?[Pp]icture)$"
     open-floating true
     opacity 1.0
     default-column-width { fixed 600; }
@@ -205,8 +230,12 @@ window-rule {
 // Google Meet PiP uses the meeting title instead of "Picture-in-Picture".
 // Its position (bottom-right, 40px margins both axes) IS a pair of fixed
 // margins, so this one translates exactly, no approximation needed.
+// title="^Meet - .+" is left without a trailing $: the source itself omits
+// one, and it makes no difference here either way — the unbounded `.+`
+// already consumes (and is unconstrained by) everything after "Meet - X",
+// so matching stops there whether or not a $ follows it.
 window-rule {
-    match app-id="((google-)?[cC]hrom(e|ium)|[bB]rave-browser|[mM]icrosoft-edge|Vivaldi-stable|helium)" title="^Meet - .+"
+    match app-id="^((google-)?[cC]hrom(e|ium)|[bB]rave-browser|[mM]icrosoft-edge|Vivaldi-stable|helium)$" title="^Meet - .+"
     open-floating true
     opacity 1.0
     default-column-width { fixed 600; }
@@ -217,13 +246,13 @@ window-rule {
 
 // ---- default/hypr/apps/qemu.lua ----
 window-rule {
-    match app-id="qemu"
+    match app-id="^qemu$"
     opacity 1.0
 }
 
 // ---- default/hypr/apps/retroarch.lua ----
 window-rule {
-    match app-id="com.libretro.RetroArch"
+    match app-id="^com.libretro.RetroArch$"
     open-fullscreen true
     opacity 1.0
     // idle_inhibit = "fullscreen" dropped; see geforce.lua's comment.
@@ -235,22 +264,31 @@ window-rule {
 
 // ---- default/hypr/apps/steam.lua ----
 window-rule {
-    match app-id="steam"
+    match app-id="^steam$"
     open-floating true
     // idle_inhibit = "fullscreen" dropped; see geforce.lua's comment.
 }
 window-rule {
-    match app-id="steam" title="Steam"
+    match app-id="^steam$" title="^Steam$"
     default-column-width { fixed 1100; }
     default-window-height { fixed 700; }
     // center = true needs no rule; see the battlenet.lua comment above.
 }
+// "steam" above and "steam.*" here are deliberately separate patterns in
+// the source (not redundant): under Hyprland's full-match semantics, bare
+// "steam" matches app-id exactly "steam", while "steam.*" also catches
+// variants like "steam_app_<id>"/"steamwebhelper"/"steam_proton" that
+// "steam" alone does not. Anchoring "steam.*" with a leading `^` (matching
+// Hyprland's implicit full-string anchor) is what preserves that
+// distinction under niri's substring search — without it, `steam.*` would
+// match any app-id merely containing "steam" anywhere in the string
+// (unrelated apps included), well beyond what the source intended.
 window-rule {
-    match app-id="steam.*"
+    match app-id="^steam.*$"
     opacity 1.0
 }
 window-rule {
-    match app-id="steam" title="Friends List"
+    match app-id="^steam$" title="^Friends List$"
     default-column-width { fixed 460; }
     default-window-height { fixed 800; }
 }
@@ -261,31 +299,31 @@ window-rule {
 // itself +floating-window in this file: the big TUI/utility app-id list and
 // the xdg-desktop-portal-gtk file-picker portal.
 window-rule {
-    match app-id="(org.omarchy.btop|org.omarchy.terminal|org.omarchy.bash|org.codeberg.dnkl.foot|org.gnome.NautilusPreviewer|org.gnome.Evince|Omarchy|About|TUI.float|imv|mpv)"
-    match app-id="xdg-desktop-portal-gtk"
-    match app-id="(sublime_text|DesktopEditors|org.gnome.Nautilus)" title="^(Open.*Files?|Open [F|f]older.*|Save.*Files?|Save.*As|Save|All Files|.*wants to [open|save].*|[C|c]hoose.*)"
+    match app-id="^(org.omarchy.btop|org.omarchy.terminal|org.omarchy.bash|org.codeberg.dnkl.foot|org.gnome.NautilusPreviewer|org.gnome.Evince|Omarchy|About|TUI.float|imv|mpv)$"
+    match app-id="^xdg-desktop-portal-gtk$"
+    match app-id="^(sublime_text|DesktopEditors|org.gnome.Nautilus)$" title="^(Open.*Files?|Open [F|f]older.*|Save.*Files?|Save.*As|Save|All Files|.*wants to [open|save].*|[C|c]hoose.*)$"
     open-floating true
     default-column-width { fixed 875; }
     default-window-height { fixed 600; }
 }
 window-rule {
-    match app-id="org.omarchy.about"
+    match app-id="^org.omarchy.about$"
     open-floating true
     default-column-width { fixed 920; }
     default-window-height { fixed 480; }
     // center = true needs no rule; see the battlenet.lua comment above.
 }
 window-rule {
-    match app-id="dev.tensaku.Tensaku"
+    match app-id="^dev.tensaku.Tensaku$"
     open-floating true
     // center = true needs no rule; see the battlenet.lua comment above.
 }
 window-rule {
-    match app-id="omacalc"
+    match app-id="^omacalc$"
     open-floating true
 }
 window-rule {
-    match app-id="org.omarchy.screensaver"
+    match app-id="^org.omarchy.screensaver$"
     open-fullscreen true
     open-floating true
     // animation = "slide" has no niri window-rule counterpart (no per-rule
@@ -363,10 +401,10 @@ window-rule {
 // src/input/mod.rs, where window_scroll_factor is applied to both the
 // Wheel and Finger axis sources).
 window-rule {
-    match app-id="(Alacritty|kitty|foot)"
+    match app-id="^(Alacritty|kitty|foot)$"
     scroll-factor 1.5
 }
 window-rule {
-    match app-id="com.mitchellh.ghostty"
+    match app-id="^com.mitchellh.ghostty$"
     scroll-factor 0.2
 }
