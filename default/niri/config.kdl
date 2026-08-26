@@ -3,6 +3,13 @@
 // once by omarchy-refresh-niri if missing, never touched again — see
 // docs/superpowers/specs/2026-08-25-omarchy-niri-config-design.md).
 
+// Hyprland's misc.allow_session_lock_restore has no niri equivalent —
+// this is the config-side half of the already-documented,
+// still-unsolved stranded-lock recovery gap (see this project's own
+// memory/status notes and
+// docs/superpowers/specs/2026-08-23-omarchy-niri-design.md's "Known
+// open risk"). Not solved by this plan.
+
 // key_press_enables_dpms / mouse_move_enables_dpms (Hyprland's DPMS-
 // wake-on-input settings) are not configured here. This project's idle
 // handling already uses the standard ext-idle-notify-v1 protocol under
@@ -82,6 +89,18 @@ input {
     }
 }
 
+// looknfeel.lua's general.layout = "dwindle" and its group{}/groupbar
+// styling (tabbed-window borders/fonts/colors) have no niri equivalent —
+// niri has exactly one layout model and no window-grouping concept (see
+// bindings.kdl's "Explicitly dropped" list). looknfeel.lua's dwindle{},
+// scrolling{}, and master{} blocks only configure layouts other than the
+// active "dwindle" one anyway, so none of that was live Hyprland
+// behavior to begin with — nothing lost by not porting it.
+// general.resize_on_border and general.allow_tearing also have no niri
+// config equivalent (confirmed against niri's full KDL schema on the
+// project's dev VM: no matching node exists in either the layout or
+// output config) — both are already off/false in this theme, so this is
+// moot either way, not a gap.
 layout {
     gaps 8
 
