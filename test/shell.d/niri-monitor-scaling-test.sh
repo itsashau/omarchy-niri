@@ -59,8 +59,17 @@ scale=$(OMARCHY_TEST_MONITOR_SCALE=1.6 run_scaling)
 pass "monitor scaling reports the current scale"
 
 # --help must work without ever touching niri or a focused output (no
-# session running is the common case this guards against).
-help_out=$(PATH="$stub_bin:$PATH" "$ROOT/bin/omarchy-niri-monitor-scaling" --help)
+# session running is the common case this guards against). Stub both
+# commands to fail outright, rather than reusing the succeeding stubs
+# above, so this actually fails if --help starts querying the focused
+# output again before its own dispatch.
+no_session_bin="$test_tmp/bin-no-session"
+mkdir -p "$no_session_bin"
+printf '#!/bin/bash\nexit 1\n' >"$no_session_bin/niri"
+printf '#!/bin/bash\nexit 1\n' >"$no_session_bin/omarchy-niri-monitor-focused"
+chmod +x "$no_session_bin/niri" "$no_session_bin/omarchy-niri-monitor-focused"
+
+help_out=$(PATH="$no_session_bin:$PATH" "$ROOT/bin/omarchy-niri-monitor-scaling" --help)
 [[ $help_out == "Usage: omarchy-niri-monitor-scaling [up|down|SCALE]" ]] ||
   fail "monitor scaling --help prints usage without a focused output" "actual: $help_out"
 pass "monitor scaling --help prints usage without a focused output"
