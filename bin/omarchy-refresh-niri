@@ -61,5 +61,12 @@ if [[ ! -f $overrides ]]; then
   cat > "$overrides" <<'EOF'
 // Personal Niri config overrides. This file is created once and never
 // touched by omarchy-refresh-niri again — edit it freely.
+//
+// Note: niri merges an xkb { } block by replacing it wholesale, not by
+// merging individual fields. If you add your own input { keyboard { xkb
+// { ... } } } here, it will silently replace — not combine with —
+// Omarchy's shipped compose-key setting (options
+// "compose:caps,shift:both_capslock_cancel"); repeat that options line
+// yourself here if you still want it.
 EOF
 fi

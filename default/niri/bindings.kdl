@@ -1,12 +1,12 @@
 // Omarchy keybindings for Niri, translated from default/hypr/bindings/*.lua.
-// Populated by later tasks in this plan; see
-// docs/superpowers/plans/2026-08-25-omarchy-niri-config.md.
 
 // Lid-switch handling (default/hypr/bindings/utilities.lua). This is a
 // top-level switch-events node, not a keyboard bind -- and per niri's own
 // docs, switch-event binds always run regardless of lock state, so
 // Hyprland's { locked = true } option on these two has no niri property
-// to port.
+// to port. lid-open's omarchy-hyprland-monitor-clamshell is Hyprland-
+// specific (see config.kdl's autostart section for the full clamshell
+// gap) and has no niri equivalent yet -- it will silently no-op here.
 switch-events {
     lid-close { spawn "omarchy-system-lid-close"; }
     lid-open { spawn "omarchy-hyprland-monitor-clamshell"; }
@@ -115,6 +115,11 @@ binds {
     Mod+Ctrl+K hotkey-overlay-title="Herdr keybindings" { spawn "omarchy-menu-herdr-keybindings"; }
     Mod+Ctrl+Q hotkey-overlay-title="Calculator" { spawn "omacalc"; }
     XF86Calculator hotkey-overlay-title="Calculator" { spawn "omacalc"; }
+
+    // Niri's own hotkey overlay, showing every bind's hotkey-overlay-title
+    // above. Niri's default key for this is Mod+Shift+Slash, but that's
+    // already taken here by Passwords (omarchy-launch-1password).
+    Mod+Ctrl+Slash hotkey-overlay-title="Show keybindings" { show-hotkey-overlay; }
 
     Mod+Shift+Space hotkey-overlay-title="Toggle top bar" { spawn "omarchy-toggle-bar"; }
     Mod+Ctrl+Space hotkey-overlay-title="Background switcher" { spawn "omarchy-menu" "toggle" "background"; }

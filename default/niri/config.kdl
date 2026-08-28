@@ -127,6 +127,13 @@ input {
 // instead (window-rule/layer-rule { background-effect { blur true } },
 // confirmed valid on the dev VM). Not enabled here since looknfeel.lua
 // has blur.enabled = false; noted for whoever writes window-rules.kdl.
+// looknfeel.lua's animations = { enabled = true } block, its 5 hl.curve()
+// definitions and 16 hl.animation() per-effect leaf tunings have no 1:1
+// niri equivalent -- niri categorizes animations by a different,
+// incompatible set of event types, with no granular per-curve/per-effect
+// translation to port to. Deliberately omitted entirely rather than
+// approximated: no animations{} block below means niri's own stock
+// animation defaults apply.
 layout {
     gaps 8
 

@@ -1,8 +1,7 @@
 // Omarchy window rules for Niri, translated from default/hypr/windows.lua,
 // default/hypr/apps/*.lua, and the terminal-specific tail of
 // default/hypr/input.lua. See
-// docs/superpowers/specs/2026-08-25-omarchy-niri-config-design.md and
-// .superpowers/sdd/2026-08-25-omarchy-niri-config/task-7-report.md.
+// docs/superpowers/specs/2026-08-25-omarchy-niri-config-design.md.
 //
 // Translation strategy note: Hyprland's o.window() wrapper lets rules tag a
 // window (tag = "+foo" / "-foo") and later rules match on `{ tag = "foo" }`.
